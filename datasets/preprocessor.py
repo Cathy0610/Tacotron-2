@@ -42,6 +42,40 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
 
+def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
+	"""
+	Preprocesses https://www.data-baker.com/open_source.html dataset from a gven input path to given output directories
+
+	Args:
+		- hparams: hyper parameters
+		- input_dir: input directory that contains the files to prerocess
+		- mel_dir: output directory of the preprocessed speech mel-spectrogram dataset
+		- linear_dir: output directory of the preprocessed speech linear-spectrogram dataset
+		- wav_dir: output directory of the preprocessed speech audio dataset
+		- n_jobs: Optional, number of worker process to parallelize across
+		- tqdm: Optional, provides a nice progress bar
+
+	Returns:
+		- A list of tuple describing the train examples. this should be written to train.txt
+	"""
+
+	# We use ProcessPoolExecutor to parallelize across processes, this is just for
+	# optimization purposes and it can be omited
+	executor = ProcessPoolExecutor(max_workers=n_jobs)
+	futures = []
+	in_dir = input_dirs[0]
+	with open(os.path.join(in_dir, 'ProsodyLabeling/000001-010000.txt'), 'r', encoding='utf-8') as f:
+		content = f.readlines()
+		num = int(len(content)//2)
+		for lineidx in range(num):
+			wavidx_raw = content[lineidx*2].split()[0]
+			wav_path = os.path.join(in_dir, ('Wave/%s.wav' % wavidx_raw))
+			text = content[lineidx*2+1].strip()
+			futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, wavidx_raw, wav_path, text, hparams)))
+
+	return [future.result() for future in tqdm(futures) if future.result() is not None]
+
+
 def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams):
 	"""
 	Preprocesses a single utterance wav/text pair
