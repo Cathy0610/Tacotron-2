@@ -1,7 +1,7 @@
 import re
 
 from . import cleaners
-from .symbols import symbols
+from .symbols import symbols, phonesplit
 
 # Mappings from symbol to numeric ID and vice versa:
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
@@ -26,15 +26,26 @@ def text_to_sequence(text, cleaner_names):
   '''
   sequence = []
 
+  symbolsequence = []
+  text = _clean_text(text, cleaner_names)
+  for pinyin in text.split():
+    initial, final = phonesplit(pinyin)
+    symbolsequence += [initial, final, ' ']
+  for s in symbolsequence:
+    if _should_keep_symbol(s):
+      sequence.append(_symbol_to_id[s])
+    elif len(s):
+      raise NameError("unkown phone name: %s" % s)
+
   # Check for curly braces and treat their contents as ARPAbet:
-  while len(text):
-    m = _curly_re.match(text)
-    if not m:
-      sequence += _symbols_to_sequence(_clean_text(text, cleaner_names))
-      break
-    sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
-    sequence += _arpabet_to_sequence(m.group(2))
-    text = m.group(3)
+  # while len(text):
+  #   m = _curly_re.match(text)
+  #   if not m:
+  #     sequence += _symbols_to_sequence(_clean_text(text, cleaner_names))
+  #     break
+  #   sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
+  #   sequence += _arpabet_to_sequence(m.group(2))
+  #   text = m.group(3)
 
   # Append EOS token
   sequence.append(_symbol_to_id['~'])
