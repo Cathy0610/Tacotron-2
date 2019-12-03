@@ -6,7 +6,7 @@ from tacotron.models.modules import *
 from tensorflow.contrib.seq2seq import dynamic_decode
 from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
 from tacotron.models.custom_decoder import CustomDecoder
-from tacotron.models.attention import LocationSensitiveAttention
+from tacotron.models.attention import LocationSensitiveAttention, BahdanauStepwiseMonotonicAttention
 
 import numpy as np
 
@@ -134,6 +134,8 @@ class Tacotron():
 					attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp, is_training=is_training,
 						mask_encoder=hp.mask_encoder, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), smoothing=hp.smoothing,
 						cumulate_weights=hp.cumulative_weights)
+					# attention_mechanism = BahdanauStepwiseMonotonicAttention(hp.attention_dim, encoder_outputs)
+					
 					#Decoder LSTM Cells
 					decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
 						size=hp.decoder_lstm_units, zoneout=hp.tacotron_zoneout_rate, scope='decoder_LSTM')
