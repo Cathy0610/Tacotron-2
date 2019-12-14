@@ -4,15 +4,18 @@ import functools
 import tensorflow as tf
 from tensorflow.contrib.seq2seq.python.ops.attention_wrapper import BahdanauAttention, BahdanauMonotonicAttention
 from tensorflow.python.layers import core as layers_core
-from tensorflow.python.ops import array_ops, math_ops, nn_ops, variable_scope
+from tensorflow.python.ops import array_ops, math_ops, nn_ops, variable_scope, random_ops
 
 
 #From https://github.com/tensorflow/tensorflow/blob/r1.7/tensorflow/contrib/seq2seq/python/ops/attention_wrapper.py
 def _compute_attention(attention_mechanism, cell_output, attention_state,
-					   attention_layer, prev_max_attentions):
+					   attention_layer):
+					#    attention_layer, prev_max_attentions):
 	"""Computes the attention and alignments for a given attention_mechanism."""
-	alignments, next_attention_state, max_attentions = attention_mechanism(
-		cell_output, state=attention_state, prev_max_attentions=prev_max_attentions)
+	# alignments, next_attention_state, max_attentions = attention_mechanism(
+	# 	cell_output, state=attention_state, prev_max_attentions=prev_max_attentions)
+	alignments, next_attention_state = attention_mechanism(
+		cell_output, state=attention_state)
 
 	# Reshape from [batch_size, memory_time] to [batch_size, 1, memory_time]
 	expanded_alignments = array_ops.expand_dims(alignments, 1)
@@ -33,7 +36,8 @@ def _compute_attention(attention_mechanism, cell_output, attention_state,
 	else:
 		attention = context
 
-	return attention, alignments, next_attention_state, max_attentions
+	return attention, alignments, next_attention_state
+	# return attention, alignments, next_attention_state, max_attentions
 
 
 def _location_sensitive_score(W_query, W_fil, W_keys):

@@ -131,10 +131,11 @@ class Tacotron():
 					#Attention Decoder Prenet
 					prenet = Prenet(is_training, layers_sizes=hp.prenet_layers, drop_rate=hp.tacotron_dropout_rate, scope='decoder_prenet')
 					#Attention Mechanism
-					attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp, is_training=is_training,
-						mask_encoder=hp.mask_encoder, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), smoothing=hp.smoothing,
-						cumulate_weights=hp.cumulative_weights)
-					# attention_mechanism = BahdanauStepwiseMonotonicAttention(hp.attention_dim, encoder_outputs)
+					# attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp, is_training=is_training,
+					# 	mask_encoder=hp.mask_encoder, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), smoothing=hp.smoothing,
+					# 	cumulate_weights=hp.cumulative_weights)
+					attention_mechanism = BahdanauStepwiseMonotonicAttention(num_units=hp.attention_dim, memory=encoder_outputs, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]))
+            
 					
 					#Decoder LSTM Cells
 					decoder_lstm = DecoderRNN(is_training, layers=hp.decoder_layers,
