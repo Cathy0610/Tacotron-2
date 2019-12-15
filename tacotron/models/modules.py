@@ -483,3 +483,167 @@ def MaskedLinearLoss(targets, outputs, targets_lengths, hparams, mask=None):
 	mean_l1_low = tf.reduce_sum(masked_l1_low) / tf.reduce_sum(mask_)
 
 	return 0.5 * mean_l1 + 0.5 * mean_l1_low
+
+
+
+def shape_list(x):
+    """Return list of dims, statically where possible."""
+    x = tf.convert_to_tensor(x)
+
+    # If unknown rank, return dynamic shape
+    if x.get_shape().dims is None:
+        return tf.shape(x)
+
+    static = x.get_shape().as_list()
+    shape = tf.shape(x)
+
+    ret = []
+    for i in range(len(static)):
+        dim = static[i]
+        if dim is None:
+            dim = shape[i]
+        ret.append(dim)
+    return ret
+
+
+class ReferenceEncoder:
+    def __init__(self, hparams, is_training=True, activation=tf.nn.relu, layer_sizes=(32, 32, 64, 64, 128, 128)):
+        self._layer_sizes = layer_sizes
+        self._n_layers = len(layer_sizes)
+        self._hparams = hparams
+        self._is_training = is_training
+        self._activation = activation
+
+    def __call__(self, inputs):
+        # CNN stacks
+        # inputs: [batch_size,n_frame,frame_size]
+        x = tf.expand_dims(inputs, axis=-1)
+        for i in range(self._n_layers):
+            with tf.variable_scope('reference_encoder_{}'.format(i)):
+                x = tf.layers.conv2d(x, filters=self._layer_sizes[i], kernel_size=3, strides=(2, 2), padding='same',
+                                     activation=tf.nn.relu)
+                x = tf.layers.batch_normalization(x, training=self._is_training)
+                if self._activation is not None:
+                    x = self._activation(x)
+        # x: [batch_size,seq_len,embed_size,channels]
+        shapes = shape_list(x)
+        # x: [batch_size,seq_len,embed_size*channels], preserving the output time resolution
+        x = tf.reshape(x, shapes[:-2] + [shapes[2] * shapes[3]])
+        return x
+
+
+
+def multihead_attention(queries,
+                        keys,
+                        num_units=None,
+                        num_heads=8,
+                        dropout_rate=0.,
+                        is_training=True,
+                        causality=False,
+                        scope='multihead_attention',
+                        reuse=None):
+    '''Applies multihead attention.
+
+    Args:
+      queries: A 3d tensor with shape of [N, T_q, C_q].
+      keys: A 3d tensor with shape of [N, T_k, C_k].
+      num_units: A scalar. Attention size: output dim
+      dropout_rate: A floating point number.
+      is_training: Boolean. Controller of mechanism for dropout.
+      causality: Boolean. If true, units that reference the future are masked.
+      num_heads: An int. Number of heads.
+      scope: Optional scope for `variable_scope`.
+      reuse: Boolean, whether to reuse the weights of a previous layer
+        by the same name.
+
+    Returns
+      A 3d tensor with shape of (N, T_q, C)
+    '''
+    with tf.variable_scope(scope, reuse=reuse):
+        # Set the fall back option for num_units
+        if num_units is None:
+            num_units = queries.get_shape().as_list[-1]
+
+        # Linear projections
+        Q = tf.layers.dense(queries, num_units, use_bias=False)  # (N, T_q, C)
+        K = tf.layers.dense(keys, num_units, use_bias=False)  # (N, T_k, C)
+        V = tf.layers.dense(keys, num_units, use_bias=False)  # (N, T_k, C)
+
+        # Split and concat
+        Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0)  # (h*N, T_q, C/h)
+        K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
+        V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, C/h)
+
+        # Multiplication
+        outputs = tf.matmul(Q_, tf.transpose(K_, [0, 2, 1]))  # (h*N, T_q, T_k)
+
+        # Scale
+        outputs = outputs / (K_.get_shape().as_list()[-1] ** 0.5)
+
+        # Key Masking
+        key_masks = tf.sign(tf.abs(tf.reduce_sum(keys, axis=-1)))  # (N, T_k)
+        key_masks = tf.tile(key_masks, [num_heads, 1])  # (h*N, T_k)
+        key_masks = tf.tile(tf.expand_dims(key_masks, 1), [1, tf.shape(queries)[1], 1])  # (h*N, T_q, T_k)
+
+        paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
+        outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
+
+        # Causality = Future blinding
+        if causality:
+            diag_vals = tf.ones_like(outputs[0, :, :])  # (T_q, T_k)
+            tril = tf.contrib.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k)
+            masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(outputs)[0], 1, 1])  # (h*N, T_q, T_k)
+
+            paddings = tf.ones_like(masks) * (-2 ** 32 + 1)
+            outputs = tf.where(tf.equal(masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
+
+        # Activation
+        outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
+
+        alignment = outputs
+        # Restore alignment shape
+        alignment = tf.concat(tf.split(alignment, num_heads, axis=0), axis=2)  # [N,T_q,C]
+
+        # Query Masking
+        query_masks = tf.sign(tf.abs(tf.reduce_sum(queries, axis=-1)))  # (N, T_q)
+        query_masks = tf.tile(query_masks, [num_heads, 1])  # (h*N, T_q)
+        query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
+        outputs *= query_masks  # broadcasting. (N, T_q, C)
+
+        # Dropouts
+        outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+
+        # Weighted sum
+        outputs = tf.matmul(outputs, V_)  # (h*N, T_q, C/h)
+
+        # Restore shape
+        outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
+
+        # ADD & NORM
+        # Residual connection
+        # extra op ?
+        # outputs += Q  # ?
+
+        # Normalize
+        # outputs = normalize(outputs)  # (N, T_q, C)
+
+    return outputs, alignment
+
+
+class StyleTokenLayer:
+    def __init__(self, output_size, is_training=True, scope=None):
+        self._output_size = output_size
+        self._is_training = is_training
+        self._scope = 'style_token' if scope is None else scope
+
+    def __call__(self, inputs, token_embedding):
+        # inputs: [batch_size,1,hp.tacotron_reference_gru_hidden_size], query
+        # output: [batch_size,1,attention_output_size]
+        x = inputs
+        with tf.variable_scope(self._scope):
+            token_embedding = tf.nn.tanh(token_embedding)  # tanh activation before attention
+            # print('x: {}'.format(x))
+            # print('token_embedding: {}'.format(token_embedding))
+            x, _ = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
+                                       is_training=self._is_training, num_heads=4)
+            return x

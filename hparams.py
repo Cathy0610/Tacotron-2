@@ -173,7 +173,16 @@ hparams = tf.contrib.training.HParams(
 	mask_encoder = True, #whether to mask encoder padding while computing attention. Set to True for better prosody but slower convergence.
 	mask_decoder = False, #Whether to use loss mask for padded sequences (if False, <stop_token> loss function will not be weighted, else recommended pos_weight = 20)
 	cross_entropy_pos_weight = 1, #Use class weights to reduce the stop token classes imbalance (by adding more penalty on False Negatives (FN)) (1 = disabled)
-	predict_linear = True, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
+
+	#Style token layer
+	tacotron_n_style_token=10,  # number of style tokens
+    tacotron_reference_layer_size=(32, 32, 64, 64, 128, 128),  # filters of style token layer
+    tacotron_reference_gru_hidden_size=128,  # hidden size
+    tacotron_style_encoder_outputs_size=512,  # dim of style token layer output
+    tacotron_style_reference_audio='reference_audio/lin.wav.npy',
+    # manually specify style token alignment weights instead of getting them from reference audio
+    tacotron_style_alignment=None,
 	###########################################################################################################################################
 
 	#Wavenet
@@ -200,7 +209,7 @@ hparams = tf.contrib.training.HParams(
 
 	#model parameters
 	#To use Gaussian distribution as output distribution instead of mixture of logistics, set "out_channels = 2" instead of "out_channels = 10 * 3". (UNDER TEST)
-	out_channels = 3*10, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
+	out_channels = 2, #This should be equal to quantize channels when input type is 'mulaw-quantize' else: num_distributions * 3 (prob, mean, log_scale).
 	layers = 20, #Number of dilated convolutions (Default: Simplified Wavenet of Tacotron-2 paper)
 	stacks = 2, #Number of dilated convolution stacks (Default: Simplified Wavenet of Tacotron-2 paper)
 	residual_channels = 128, #Number of residual block input/output channels.
@@ -243,7 +252,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	#train/test split ratios, mini-batches sizes
-	tacotron_batch_size = 32*2, #number of training samples on each training steps
+	tacotron_batch_size = 32, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing). 
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
 	tacotron_synthesis_batch_size = 1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
@@ -335,7 +344,7 @@ hparams = tf.contrib.training.HParams(
 	wavenet_natural_eval = False, #Whether to use 100% natural eval (to evaluate autoregressivity performance) or with teacher forcing to evaluate overfit and model consistency.
 
 	#Tacotron-2 integration parameters
-	train_with_GTA = False, #Whether to use GTA mels to train WaveNet instead of ground truth mels.
+	train_with_GTA = True, #Whether to use GTA mels to train WaveNet instead of ground truth mels.
 	###########################################################################################################################################
 
 	#Eval/Debug parameters
