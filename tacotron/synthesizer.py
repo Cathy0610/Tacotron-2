@@ -15,17 +15,21 @@ from tacotron.utils.text import text_to_sequence
 
 
 class Synthesizer:
-	def load(self, checkpoint_path, hparams, gta=False, model_name='Tacotron'):
+	def load(self, checkpoint_path, hparams, gta=False, style_transfer=True, model_name='Tacotron'):
 		log('Constructing model: %s' % model_name)
 		#Force the batch size to be known in order to use attention masking in batch synthesis
 		inputs = tf.placeholder(tf.int32, (None, None), name='inputs')
 		input_lengths = tf.placeholder(tf.int32, (None), name='input_lengths')
 		targets = tf.placeholder(tf.float32, (None, None, hparams.num_mels), name='mel_targets')
+		target_lengths = tf.placeholder(tf.int32, (None), name='target_lengths')
 		split_infos = tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos')
 		with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
 				self.model.initialize(inputs, input_lengths, targets, gta=gta, split_infos=split_infos)
+			elif style_transfer and hparams.tacotron_style_reference_audio is not None:
+				self.model.initialize(inputs, input_lengths, targets, targets_lengths=target_lengths,is_training=False,
+									  is_evaluating=False, style_transfer=True, split_infos=split_infos)
 			else:
 				self.model.initialize(inputs, input_lengths, split_infos=split_infos)
 
@@ -43,6 +47,7 @@ class Synthesizer:
 			self.GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(self.GLGPU_lin_inputs, hparams)
 
 		self.gta = gta
+		self.style_transfer = style_transfer
 		self._hparams = hparams
 		#pad input sequences with the <pad_token> 0 ( _ )
 		self._pad = 0
@@ -56,6 +61,7 @@ class Synthesizer:
 		self.inputs = inputs
 		self.input_lengths = input_lengths
 		self.targets = targets
+		self.target_lengths = target_lengths
 		self.split_infos = split_infos
 
 		log('Loading checkpoint: %s' % checkpoint_path)
@@ -118,6 +124,36 @@ class Synthesizer:
 
 			feed_dict[self.targets] = target_seqs
 			assert len(np_targets) == len(texts)
+
+
+		if self.style_transfer and hparams.tacotron_style_reference_audio is not None and \
+				hparams.tacotron_style_alignment is None:
+			# only support one style reference audio
+			if hparams.tacotron_style_reference_audio[-4:].lower() == '.wav':
+				wav = audio.load_wav(hparams.tacotron_style_reference_audio, sr=hparams.sample_rate)
+				np_targets = audio.melspectrogram(wav, self._hparams).astype(np.float32).T
+			else:
+				np_targets = np.load(hparams.tacotron_style_reference_audio)
+			target_lengths = len(np_targets)
+
+			# copy
+			np_targets = [np_targets for _ in range(len(texts))]
+			target_lengths = [target_lengths for _ in range(len(texts))]
+
+			# pad targets according to each GPU max length
+			target_seqs = None
+			for i in range(self._hparams.tacotron_num_gpus):
+				device_target = np_targets[size_per_device * i: size_per_device * (i + 1)]
+				device_target, max_target_len = self._prepare_targets(device_target, self._hparams.outputs_per_step)
+				target_seqs = np.concatenate((target_seqs, device_target),
+											 axis=1) if target_seqs is not None else device_target
+				split_infos[i][1] = \
+					max_target_len  # Not really used but setting it in case for future development maybe?
+
+			feed_dict[self.targets] = target_seqs
+			feed_dict[self.target_lengths] = target_lengths
+			assert len(np_targets) == len(texts)
+		
 
 		feed_dict[self.split_infos] = np.asarray(split_infos, dtype=np.int32)
 

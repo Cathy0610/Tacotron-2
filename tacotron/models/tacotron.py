@@ -323,6 +323,7 @@ class Tacotron():
 		self.all_vars = tf.trainable_variables()
 
 		log('Initialized Tacotron model. Dimensions (? = dynamic shape): ')
+		log('  Style transfer:           {}'.format(style_transfer))
 		log('  Train mode:               {}'.format(is_training))
 		log('  Eval mode:                {}'.format(is_evaluating))
 		log('  GTA mode:                 {}'.format(gta))
