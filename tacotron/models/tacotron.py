@@ -25,7 +25,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False, style_transfer=True,
+	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
 			global_step=None, is_training=False, is_evaluating=False, split_infos=None):
 		"""
 		Initializes the model for inference
@@ -41,7 +41,7 @@ class Tacotron():
 		"""
 		if mel_targets is None and stop_token_targets is not None:
 			raise ValueError('no multi targets were provided but token_targets were given')
-		if mel_targets is not None and stop_token_targets is None and not gta:
+		if mel_targets is not None and stop_token_targets is None and not gta and not self._hparams.tacotron_style_transfer:
 			raise ValueError('Mel targets are provided without corresponding token_targets')
 		if not gta and self._hparams.predict_linear==True and linear_targets is None and is_training:
 			raise ValueError('Model is set to use post processing to predict linear spectrograms in training but no linear targets given!')
@@ -51,7 +51,7 @@ class Tacotron():
 			raise RuntimeError('Model set to mask paddings but no targets lengths provided for the mask!')
 		if is_training and is_evaluating:
 			raise RuntimeError('Model can not be in training and evaluation modes at the same time!')
-		if style_transfer and (not is_training) and (not is_evaluating):
+		if self._hparams.tacotron_style_transfer and (not is_training) and (not is_evaluating):
 			assert (self._hparams.tacotron_style_reference_audio is not None or 
 				(self._hparams.tacotron_style_alignment is not None and
 				len(self._hparams.tacotron_style_alignment) == self._hparams.tacotron_n_style_token))
@@ -131,13 +131,14 @@ class Tacotron():
 					enc_conv_output_shape = encoder_cell.conv_output_shape
 
 					# style token layers
-					self.style_embedding_table = tf.get_variable(
-						'style_token_embedding', [hp.tacotron_n_style_token, hp.embedding_dim], dtype=tf.float32,
-						initializer=tf.truncated_normal_initializer(stddev=0.5)
-					)
+					if self._hparams.tacotron_style_transfer:
+						self.style_embedding_table = tf.get_variable(
+							'style_token_embedding', [hp.tacotron_n_style_token, hp.embedding_dim], dtype=tf.float32,
+							initializer=tf.truncated_normal_initializer(stddev=0.5)
+						)
 
 					# in order to synthese audio in random weights, style_encoder_outputs[-1]==style_embedding_table[-1]
-					if (is_training or is_evaluating) and style_transfer:
+					if (is_training or is_evaluating) and self._hparams.tacotron_style_transfer:
 						style_encoder_cell = TacotronReferenceEncoderCell(
 							ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size, is_training=is_training,
 											 activation=tf.nn.relu),
@@ -155,7 +156,7 @@ class Tacotron():
 						seq_len = tf.shape(encoder_outputs)[1]
 						style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
 						encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-					elif (not is_training) and (not is_evaluating) and style_transfer:  # synthesis with style transfer
+					elif (not is_training) and (not is_evaluating) and self._hparams.tacotron_style_transfer:  # synthesis with style transfer
 						if hp.tacotron_style_alignment is not None and \
 								len(hp.tacotron_style_alignment) == hp.tacotron_n_style_token:
 							# random weights
@@ -206,7 +207,7 @@ class Tacotron():
 					# attention_mechanism = LocationSensitiveAttention(hp.attention_dim, encoder_outputs, hparams=hp, is_training=is_training,
 					# 	mask_encoder=hp.mask_encoder, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), smoothing=hp.smoothing,
 					# 	cumulate_weights=hp.cumulative_weights)
-					attention_mechanism = BahdanauStepwiseMonotonicAttention(num_units=hp.attention_dim, memory=encoder_outputs, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]))
+					attention_mechanism = BahdanauStepwiseMonotonicAttention(num_units=hp.attention_dim, memory=encoder_outputs, memory_sequence_length=tf.reshape(tower_input_lengths[i], [-1]), mode=hp.sm_attention_mode)
             
 					
 					#Decoder LSTM Cells
@@ -323,7 +324,7 @@ class Tacotron():
 		self.all_vars = tf.trainable_variables()
 
 		log('Initialized Tacotron model. Dimensions (? = dynamic shape): ')
-		log('  Style transfer:           {}'.format(style_transfer))
+		log('  Style transfer:           {}'.format(self._hparams.tacotron_style_transfer))
 		log('  Train mode:               {}'.format(is_training))
 		log('  Eval mode:                {}'.format(is_evaluating))
 		log('  GTA mode:                 {}'.format(gta))

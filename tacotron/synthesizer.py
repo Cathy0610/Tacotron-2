@@ -15,7 +15,7 @@ from tacotron.utils.text import text_to_sequence
 
 
 class Synthesizer:
-	def load(self, checkpoint_path, hparams, gta=False, style_transfer=True, model_name='Tacotron'):
+	def load(self, checkpoint_path, hparams, gta=False, model_name='Tacotron'):
 		log('Constructing model: %s' % model_name)
 		#Force the batch size to be known in order to use attention masking in batch synthesis
 		inputs = tf.placeholder(tf.int32, (None, None), name='inputs')
@@ -27,9 +27,9 @@ class Synthesizer:
 			self.model = create_model(model_name, hparams)
 			if gta:
 				self.model.initialize(inputs, input_lengths, targets, gta=gta, split_infos=split_infos)
-			elif style_transfer and hparams.tacotron_style_reference_audio is not None:
+			elif hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None:
 				self.model.initialize(inputs, input_lengths, targets, targets_lengths=target_lengths,is_training=False,
-									  is_evaluating=False, style_transfer=True, split_infos=split_infos)
+									  is_evaluating=False, split_infos=split_infos)
 			else:
 				self.model.initialize(inputs, input_lengths, split_infos=split_infos)
 
@@ -47,7 +47,6 @@ class Synthesizer:
 			self.GLGPU_lin_outputs = audio.inv_linear_spectrogram_tensorflow(self.GLGPU_lin_inputs, hparams)
 
 		self.gta = gta
-		self.style_transfer = style_transfer
 		self._hparams = hparams
 		#pad input sequences with the <pad_token> 0 ( _ )
 		self._pad = 0
@@ -126,7 +125,7 @@ class Synthesizer:
 			assert len(np_targets) == len(texts)
 
 
-		if self.style_transfer and hparams.tacotron_style_reference_audio is not None and \
+		if hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None and \
 				hparams.tacotron_style_alignment is None:
 			# only support one style reference audio
 			if hparams.tacotron_style_reference_audio[-4:].lower() == '.wav':

@@ -140,6 +140,9 @@ hparams = tf.contrib.training.HParams(
 	attention_filters = 32, #number of attention convolution filters
 	attention_kernel = (31, ), #kernel size of attention convolution
 	cumulative_weights = True, #Whether to cumulate (sum) all previous attention weights or simply feed previous weights (Recommended: True)
+	#StepWise Monotonice Attention
+	sm_attention = True,
+	sm_attention_mode = "parallel", # "hard" or "parallel" for inference; "parallel" for training
 
 	#Attention synthesis constraints
 	#"Monotonic" constraint forces the model to only look at the forwards attention_win_size steps.
@@ -176,14 +179,15 @@ hparams = tf.contrib.training.HParams(
 	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 
 	#Style token layer
-	tacotron_n_style_token=10,  # number of style tokens
-    tacotron_reference_layer_size=(32, 32, 64, 64, 128, 128),  # filters of style token layer
-    tacotron_reference_gru_hidden_size=128,  # hidden size
-    tacotron_style_encoder_outputs_size=512,  # dim of style token layer output
-    # tacotron_style_reference_audio='ref_audio/lin.wav.npy',
-    tacotron_style_reference_audio=None,
+	tacotron_style_transfer = True,
+	tacotron_n_style_token = 10,  # number of style tokens
+    tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
+    tacotron_reference_gru_hidden_size = 128,  # hidden size
+    tacotron_style_encoder_outputs_size = 512,  # dim of style token layer output
+    # tacotron_style_reference_audio = 'ref_audio/lin.wav.npy',
+    tacotron_style_reference_audio = 'ref_audio/story.wav',
     # manually specify style token alignment weights instead of getting them from reference audio
-    tacotron_style_alignment=[0.8, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    tacotron_style_alignment = None,
 	###########################################################################################################################################
 
 	#Wavenet
