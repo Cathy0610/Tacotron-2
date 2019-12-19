@@ -1,0 +1,7 @@
+.*
+LICENSE
+*.md
+zh*.txt
+docker
+logs*
+papers
