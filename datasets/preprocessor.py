@@ -5,7 +5,7 @@ from functools import partial
 import numpy as np
 from datasets import audio
 from wavenet_vocoder.util import is_mulaw, is_mulaw_quantize, mulaw, mulaw_quantize
-
+from tacotron.utils.symbols import _sep, _final_er, phonesplit
 
 def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
@@ -63,6 +63,71 @@ def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir,
 	# optimization purposes and it can be omited
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
+	for in_dir in input_dirs:
+		with open(os.path.join(in_dir, 'metadata.txt'), 'r', encoding='utf-8') as f:
+			lines = f.readlines()
+			# print(len(lines))
+			for lineidx in range(0, len(lines), 2):
+			# for lineidx in [14050]:
+				wavidx_raw, text_raw = lines[lineidx].split()
+				phonemes_raw = lines[lineidx+1].strip().split()
+				wav_path = os.path.join(in_dir, ('wav/%s.wav' % wavidx_raw))
+
+				text_clean = text_raw
+				for punctuation in ['“', '”', '、', '，', '。', '：', '；', '？', '！', '—', '——', '…', '……', '#']:
+					text_clean = text_clean.replace(punctuation, '')
+				
+				print(wav_path)
+				symbols = []
+				while len(text_clean):
+					if text_clean[0].isdigit():
+						symbols += text_clean[0]
+					else:
+						if text_clean[0]<='z' and text_clean>='A':
+							if len(symbols) and not symbols[-1].isdigit():
+								symbols.append(_sep)
+							if phonemes_raw[0] is '/':
+								phonemes_raw = phonemes_raw[1:]
+							while phonemes_raw[0] not in ['/', '.']:
+								symbols.append(phonemes_raw[0])
+								phonemes_raw = phonemes_raw[1:]
+							phonemes_raw = phonemes_raw[1:]
+						elif text_clean[0]!='儿' or (len(symbols)==0) or (symbols[-1][:-1] not in _final_er):
+							if len(symbols) and not symbols[-1].isdigit():
+								symbols.append(_sep)
+							symbols += phonesplit(phonemes_raw[0])
+							phonemes_raw = phonemes_raw[1:]
+					text_clean = text_clean[1:]
+				text = ' '.join(symbols)
+				# print(text)
+				
+				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, wavidx_raw, wav_path, text, hparams)))
+
+	return [future.result() for future in tqdm(futures) if future.result() is not None]
+
+
+
+def build_from_path_databaker_os(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
+	"""
+	Preprocesses https://www.data-baker.com/open_source.html dataset from a gven input path to given output directories
+
+	Args:
+		- hparams: hyper parameters
+		- input_dir: input directory that contains the files to prerocess
+		- mel_dir: output directory of the preprocessed speech mel-spectrogram dataset
+		- linear_dir: output directory of the preprocessed speech linear-spectrogram dataset
+		- wav_dir: output directory of the preprocessed speech audio dataset
+		- n_jobs: Optional, number of worker process to parallelize across
+		- tqdm: Optional, provides a nice progress bar
+
+	Returns:
+		- A list of tuple describing the train examples. this should be written to train.txt
+	"""
+
+	# We use ProcessPoolExecutor to parallelize across processes, this is just for
+	# optimization purposes and it can be omited
+	executor = ProcessPoolExecutor(max_workers=n_jobs)
+	futures = []
 	in_dir = input_dirs[0]
 	with open(os.path.join(in_dir, 'ProsodyLabeling/000001-010000.txt'), 'r', encoding='utf-8') as f:
 		content = f.readlines()
@@ -74,6 +139,7 @@ def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir,
 			futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, wavidx_raw, wav_path, text, hparams)))
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
+
 
 
 def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams):

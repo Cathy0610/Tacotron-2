@@ -26,16 +26,14 @@ def text_to_sequence(text, cleaner_names):
   '''
   sequence = []
 
-  symbolsequence = []
   text = _clean_text(text, cleaner_names)
-  for pinyin in text.split():
-    initial, final = phonesplit(pinyin)
-    symbolsequence += [initial, final, ' ']
+  symbolsequence = text.split()
+  
   for s in symbolsequence:
     if _should_keep_symbol(s):
       sequence.append(_symbol_to_id[s])
     elif len(s):
-      raise NameError("unkown phone name: %s" % s)
+      raise NameError("unkown phoneme name: %s" % s)
 
   # Check for curly braces and treat their contents as ARPAbet:
   # while len(text):

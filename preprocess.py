@@ -15,6 +15,8 @@ def preprocess(args, input_folders, out_dir, hparams):
 	os.makedirs(wav_dir, exist_ok=True)
 	os.makedirs(linear_dir, exist_ok=True)
 	if args.dataset.startswith('databaker'):
+		if args.dataset.startswith('databaker_os'):
+			metadata = preprocessor.build_from_path_databaker_os(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 		metadata = preprocessor.build_from_path_databaker(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	else:
 		metadata = preprocessor.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
@@ -39,13 +41,20 @@ def norm_data(args):
 	merge_books = (args.merge_books=='True')
 
 	print('Selecting data folders..')
-	supported_datasets = ['databaker', 'LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
+	supported_datasets = ['databaker', 'databaker_os', 'LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
 
-	if args.dataset.startswith('databaker'):
+	if args.dataset.startswith('databaker_os'):
 		return [os.path.expanduser('~/DataBaker')]
+	
+	if args.dataset.startswith('databaker'):
+		return [os.path.expanduser(path) for path in [
+			'~/DB-6/000001-010000',
+			'~/DB-6-Emo/DB-TTS-040/sad',
+			'~/DB-6-Emo/DB-TTS-040/happy'
+		]]
 
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
