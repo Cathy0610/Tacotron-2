@@ -26,7 +26,7 @@ def text_to_sequence(text, cleaner_names):
   '''
   sequence = []
 
-  text = _clean_text(text, cleaner_names)
+  # text = _clean_text(text, cleaner_names)
   symbolsequence = text.split()
   
   for s in symbolsequence:

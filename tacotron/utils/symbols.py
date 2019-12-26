@@ -84,18 +84,19 @@ _final_er = []
 for f in _final_n:
     if f[-1] != 'r':
         _final_er.append(f+'r')
-_finals_net = _final_n + _final_er
+_finals_net = _final_n + _final_er + ['ng']
 _finals = []
 for f in _finals_net:
     _finals += [f+str(i) for i in range(1, 7)]
 
 
 def phonesplit(pinyin):
-    # print(pinyin)
     if len(pinyin) > 1:
-        if pinyin[:2] in _initials:
+        if (pinyin[0] in ['z', 'c', 's']) and (pinyin[1] is 'h'):    # zh ch sh
             return (pinyin[:2], pinyin[2:])
         elif pinyin[0] in _initials:
+            if pinyin[0:2] == 'ng': # special case 'ng'
+                return ('', pinyin)
             return (pinyin[0], pinyin[1:])
         else:
             return ('', pinyin)
