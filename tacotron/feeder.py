@@ -76,7 +76,7 @@ class Feeder:
 			tf.placeholder(tf.int32, shape=(None, ), name='input_lengths'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='mel_targets'),
 			tf.placeholder(tf.float32, shape=(None, None), name='token_targets'),
-			tf.placeholder(tf.float32, shape=(None, None, hparams.num_freq), name='linear_targets'),
+			tf.placeholder(tf.float32, shape=((None, None, hparams.num_freq) if self._hparams.predict_linear else ()), name='linear_targets'),
 			tf.placeholder(tf.int32, shape=(None, ), name='targets_lengths'),
 			tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos'),
 			]
@@ -128,7 +128,7 @@ class Feeder:
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
-		linear_target = np.load(os.path.join(self._linear_dir, meta[2]))
+		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None
 		return (input_data, mel_target, token_target, linear_target, len(mel_target))
 
 	def make_test_batches(self):
@@ -192,7 +192,7 @@ class Feeder:
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
-		linear_target = np.load(os.path.join(self._linear_dir, meta[2]))
+		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None
 		return (input_data, mel_target, token_target, linear_target, len(mel_target))
 
 	def _prepare_batch(self, batches, outputs_per_step):
@@ -221,8 +221,11 @@ class Feeder:
 			#Pad sequences with 1 to infer that the sequence is done
 			token_target_cur_device, token_target_max_len = self._prepare_token_targets([x[2] for x in batch], outputs_per_step)
 			token_targets = np.concatenate((token_targets, token_target_cur_device),axis=1) if token_targets is not None else token_target_cur_device
-			linear_targets_cur_device, linear_target_max_len = self._prepare_targets([x[3] for x in batch], outputs_per_step)
-			linear_targets = np.concatenate((linear_targets, linear_targets_cur_device), axis=1) if linear_targets is not None else linear_targets_cur_device
+			if self._hparams.predict_linear:
+				linear_targets_cur_device, linear_target_max_len = self._prepare_targets([x[3] for x in batch], outputs_per_step)
+				linear_targets = np.concatenate((linear_targets, linear_targets_cur_device), axis=1) if linear_targets is not None else linear_targets_cur_device
+			else:
+				linear_target_max_len = 0
 			split_infos.append([input_max_len, mel_target_max_len, token_target_max_len, linear_target_max_len])
 
 		split_infos = np.asarray(split_infos, dtype=np.int32)

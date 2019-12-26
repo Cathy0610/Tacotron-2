@@ -220,12 +220,13 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
 		return None
 
-	#Compute the linear scale spectrogram from the wav
-	linear_spectrogram = audio.linearspectrogram(preem_wav, hparams).astype(np.float32)
-	linear_frames = linear_spectrogram.shape[1]
+	if hparams.predict_linear:
+		#Compute the linear scale spectrogram from the wav
+		linear_spectrogram = audio.linearspectrogram(preem_wav, hparams).astype(np.float32)
+		linear_frames = linear_spectrogram.shape[1]
 
-	#sanity check
-	assert linear_frames == mel_frames
+		#sanity check
+		assert linear_frames == mel_frames
 
 	if hparams.use_lws:
 		#Ensure time resolution adjustement between audio and mel-spectrogram
@@ -253,10 +254,13 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	# Write the spectrogram and audio to disk
 	audio_filename = 'audio-{}.npy'.format(index)
 	mel_filename = 'mel-{}.npy'.format(index)
-	linear_filename = 'linear-{}.npy'.format(index)
 	np.save(os.path.join(wav_dir, audio_filename), out.astype(out_dtype), allow_pickle=False)
 	np.save(os.path.join(mel_dir, mel_filename), mel_spectrogram.T, allow_pickle=False)
-	np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
+
+	linear_filename = ''
+	if hparams.predict_linear:
+		linear_filename = 'linear-{}.npy'.format(index)
+		np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
 
 	# Return a tuple describing this training example
 	return (audio_filename, mel_filename, linear_filename, time_steps, mel_frames, text)
