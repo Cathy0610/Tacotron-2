@@ -32,7 +32,7 @@ def plot_alignment(alignment, path, title=None, split_title=False, max_len=None)
 		title = split_title_line(title)
 
 	plt.xlabel(xlabel)
-	plt.title(title)
+	# plt.title(title)
 	plt.ylabel('Encoder timestep')
 	plt.tight_layout()
 	plt.savefig(path, format='png')
@@ -49,7 +49,7 @@ def plot_spectrogram(pred_spectrogram, path, title=None, split_title=False, targ
 
 	fig = plt.figure(figsize=(10, 8))
 	# Set common labels
-	fig.text(0.5, 0.18, title, horizontalalignment='center', fontsize=16)
+	# fig.text(0.5, 0.18, title, horizontalalignment='center', fontsize=16)
 
 	#target spectrogram subplot
 	if target_spectrogram is not None:
