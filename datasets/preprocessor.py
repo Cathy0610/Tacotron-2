@@ -82,22 +82,32 @@ def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir,
 				while len(text_clean):
 					if text_clean[0].isdigit():
 						symbols += text_clean[0]
+						text_clean = text_clean[1:]
 					else:
-						if text_clean[0]<='z' and text_clean>='A':
+						if text_clean[0]<='z' and text_clean[0]>='A': # English segment
+							# 1. insert sep between word
 							if len(symbols) and not symbols[-1].isdigit():
 								symbols.append(_sep)
+							# 2. extract word
+							while text_clean[0]<='z' and text_clean[0]>='A':
+								text_clean = text_clean[1:]
+							# 3. remove leading '/' sep (if any)
 							if phonemes_raw[0] is '/':
 								phonemes_raw = phonemes_raw[1:]
-							while phonemes_raw[0] not in ['/', '.']:
+							# 4. extract phoneme
+							while len(phonemes_raw)>0 and phonemes_raw[0] != '/':
 								symbols.append(phonemes_raw[0])
 								phonemes_raw = phonemes_raw[1:]
+							# 5. remove tail '/'
 							phonemes_raw = phonemes_raw[1:]
-						elif text_clean[0]!='儿' or (len(symbols)==0) or (symbols[-1][:-1] not in _final_er):
+						elif text_clean[0]!='儿' or (len(symbols)==0) or (symbols[-1][:-1] not in _final_er): # Chinese segment
 							if len(symbols) and not symbols[-1].isdigit():
 								symbols.append(_sep)
 							symbols += phonesplit(phonemes_raw[0])
 							phonemes_raw = phonemes_raw[1:]
-					text_clean = text_clean[1:]
+							text_clean = text_clean[1:]
+						else:	# 儿化音
+							text_clean = text_clean[1:]
 				text = ' '.join(symbols)
 				# print(text)
 				

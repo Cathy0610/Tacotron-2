@@ -52,8 +52,11 @@ def norm_data(args):
 	if args.dataset.startswith('databaker'):
 		return [os.path.expanduser(path) for path in [
 			'~/DB-6/000001-010000',
-			'~/DB-6-Emo/DB-TTS-040/sad',
-			'~/DB-6-Emo/DB-TTS-040/happy'
+			'~/DB-6-Emo/DB-TTS-040-2/angry',
+			'~/DB-6-Emo/DB-TTS-040-2/disgust',
+			'~/DB-6-Emo/DB-TTS-040-2/fear',
+			'~/DB-6-Emo/DB-TTS-040-2/happy',
+			'~/DB-6-Emo/DB-TTS-040-2/sad'
 		]]
 
 	if args.dataset.startswith('LJSpeech'):
