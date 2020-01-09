@@ -26,7 +26,7 @@ class Tacotron():
 		self._hparams = hparams
 
 	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
-			global_step=None, is_training=False, is_evaluating=False, split_infos=None):
+			global_step=None, is_training=False, is_evaluating=False, split_infos=None, input_emo_labels=None):
 		"""
 		Initializes the model for inference
 		sets "mel_outputs" and "alignments" fields.
@@ -66,6 +66,7 @@ class Tacotron():
 
 			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 			tower_targets_lengths = tf.split(targets_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if targets_lengths is not None else targets_lengths
+			tower_input_emo_labels = tf.split(input_emo_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if input_emo_labels is not None else input_emo_labels
 
 			p_inputs = tf.py_func(split_func, [inputs, split_infos[:, 0]], lout_int)
 			p_mel_targets = tf.py_func(split_func, [mel_targets, split_infos[:,1]], lout_float) if mel_targets is not None else mel_targets
@@ -94,6 +95,7 @@ class Tacotron():
 		self.tower_decoder_output = []
 		self.tower_alignments = []
 		self.tower_style_alignments = []
+		self.tower_style_logits = []
 		self.tower_style_encoder_outputs = []
 		self.tower_stop_token_prediction = []
 		self.tower_mel_outputs = []
@@ -152,7 +154,7 @@ class Tacotron():
 							hparams=hp
 						)
 						# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2]
-						style_encoder_outputs, style_alignment = style_encoder_cell(tower_mel_targets[i],
+						style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
 																   input_lengths=tower_targets_lengths[i],
 																   style_token_embedding=self.style_embedding_table)
 						# [batch_size,seq_len,hp.encoder_lstm_units*2]
@@ -172,7 +174,7 @@ class Tacotron():
 								hparams=hp
 							)
 							# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2(hp.tacotron_style_encoder_outputs_size)]
-							style_encoder_outputs, style_alignment = style_encoder_cell(tower_mel_targets[i],
+							style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
 																	   # audio style reference audio
 																	   input_lengths=tower_targets_lengths[i],
 																	   style_token_embedding=self.style_embedding_table)
@@ -194,7 +196,7 @@ class Tacotron():
 												is_training=is_training)
 							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
 														multiples=[batch_size, 1, 1])
-							style_encoder_outputs, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
+							style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
 																		token_embedding=token_embedding,
 																		input_alignment=input_alignment)
 							seq_len = tf.shape(encoder_outputs)[1]
@@ -327,7 +329,7 @@ class Tacotron():
 						if self._hparams.tacotron_style_encoder_output is None:
 							self.tower_style_alignments.append(style_alignment)
 						self.tower_style_encoder_outputs.append(style_encoder_outputs)
-						
+					self.tower_style_logits.append(tf.squeeze(style_logits, [1]))
 					self.tower_decoder_output.append(decoder_output)
 					self.tower_alignments.append(alignments)
 					self.tower_stop_token_prediction.append(stop_token_prediction)
@@ -347,6 +349,7 @@ class Tacotron():
 			self.ratio = self.helper._ratio
 		self.tower_inputs = tower_inputs
 		self.tower_input_lengths = tower_input_lengths
+		self.tower_input_emo_labels = tower_input_emo_labels
 		self.tower_mel_targets = tower_mel_targets
 		self.tower_linear_targets = tower_linear_targets
 		self.tower_targets_lengths = tower_targets_lengths
@@ -365,6 +368,8 @@ class Tacotron():
 			log('  device:                   {}'.format(i))
 			log('  embedding:                {}'.format(tower_embedded_inputs[i].shape))
 			log('  enc conv out:             {}'.format(tower_enc_conv_output_shape[i]))
+			log('  emo label:                {}'.format(self.tower_input_emo_labels[i].shape))
+			log('  style logits:            {}'.format(self.tower_style_logits[i].shape))
 			log('  encoder out:              {}'.format(tower_encoder_outputs[i].shape))
 			log('  decoder out:              {}'.format(self.tower_decoder_output[i].shape))
 			log('  residual out:             {}'.format(tower_residual[i].shape))
@@ -387,6 +392,7 @@ class Tacotron():
 		self.tower_stop_token_loss = []
 		self.tower_regularization_loss = []
 		self.tower_linear_loss = []
+		self.tower_emo_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -394,6 +400,7 @@ class Tacotron():
 		total_stop_token_loss = 0
 		total_regularization_loss = 0
 		total_linear_loss = 0
+		total_emo_loss = 0
 		total_loss = 0
 
 		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
@@ -411,6 +418,11 @@ class Tacotron():
 						#Compute <stop_token> loss (for learning dynamic generation stop)
 						stop_token_loss = MaskedSigmoidCrossEntropy(self.tower_stop_token_targets[i],
 							self.tower_stop_token_prediction[i], self.tower_targets_lengths[i], hparams=self._hparams)
+						# Compute emo label loss
+						one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
+						log('one_hot_label:{}'.format(one_hot_label.shape))
+						log('style_attention_logits:{}'.format(self.tower_style_logits[i].shape))
+						emo_loss = tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i])
 						#Compute masked linear loss
 						if hp.predict_linear:
 							#Compute Linear L1 mask loss (priority to low frequencies)
@@ -427,6 +439,9 @@ class Tacotron():
 						stop_token_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
 							labels=self.tower_stop_token_targets[i],
 							logits=self.tower_stop_token_prediction[i]))
+						# Compute emo label loss
+						one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
+						emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
 
 						if hp.predict_linear:
 							#Compute linear loss
@@ -458,8 +473,9 @@ class Tacotron():
 					self.tower_stop_token_loss.append(stop_token_loss)
 					self.tower_regularization_loss.append(regularization)
 					self.tower_linear_loss.append(linear_loss)
+					self.tower_emo_loss.append(emo_loss)
 
-					tower_loss = before + after + stop_token_loss + regularization + linear_loss
+					tower_loss = before + after + stop_token_loss + regularization + linear_loss + emo_loss
 					self.tower_loss.append(tower_loss)
 
 			total_before_loss += before
@@ -467,6 +483,7 @@ class Tacotron():
 			total_stop_token_loss += stop_token_loss
 			total_regularization_loss += regularization
 			total_linear_loss += linear_loss
+			total_emo_loss += emo_loss
 			total_loss += tower_loss
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
@@ -474,6 +491,7 @@ class Tacotron():
 		self.stop_token_loss = total_stop_token_loss / hp.tacotron_num_gpus
 		self.regularization_loss = total_regularization_loss / hp.tacotron_num_gpus
 		self.linear_loss = total_linear_loss / hp.tacotron_num_gpus
+		self.emo_loss = total_emo_loss / hp.tacotron_num_gpus
 		self.loss = total_loss / hp.tacotron_num_gpus
 
 	def add_optimizer(self, global_step):

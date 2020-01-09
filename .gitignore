@@ -104,8 +104,8 @@ venv.bak/
 .mypy_cache/
 
 # Tacotron 2 oddities
-logs-*/
-tacotron_*output/
+logs-*
+tacotron_*/
 training_data*/
 
 # ground truth mel-scale

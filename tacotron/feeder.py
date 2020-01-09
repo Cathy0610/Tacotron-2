@@ -8,6 +8,7 @@ import tensorflow as tf
 from infolog import log
 from sklearn.model_selection import train_test_split
 from tacotron.utils.text import text_to_sequence
+from tacotron.utils.emo import emo_to_id
 
 _batches_per_group = 64
 
@@ -79,12 +80,13 @@ class Feeder:
 			tf.placeholder(tf.float32, shape=((None, None, hparams.num_freq) if self._hparams.predict_linear else ()), name='linear_targets'),
 			tf.placeholder(tf.int32, shape=(None, ), name='targets_lengths'),
 			tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos'),
+			tf.placeholder(tf.int32, shape=(None,), name='input_emo_labels'),
 			]
 
 			# Create queue for buffering data
-			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='input_queue')
+			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32, tf.int32], name='input_queue')
 			self._enqueue_op = queue.enqueue(self._placeholders)
-			self.inputs, self.input_lengths, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos = queue.dequeue()
+			self.inputs, self.input_lengths, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos, self.input_emo_labels = queue.dequeue()
 
 			self.inputs.set_shape(self._placeholders[0].shape)
 			self.input_lengths.set_shape(self._placeholders[1].shape)
@@ -93,12 +95,13 @@ class Feeder:
 			self.linear_targets.set_shape(self._placeholders[4].shape)
 			self.targets_lengths.set_shape(self._placeholders[5].shape)
 			self.split_infos.set_shape(self._placeholders[6].shape)
+			self.input_emo_labels.set_shape(self._placeholders[7].shape)
 
 			# Create eval queue for buffering eval data
-			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='eval_queue')
+			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32, tf.int32], name='eval_queue')
 			self._eval_enqueue_op = eval_queue.enqueue(self._placeholders)
 			self.eval_inputs, self.eval_input_lengths, self.eval_mel_targets, self.eval_token_targets, \
-				self.eval_linear_targets, self.eval_targets_lengths, self.eval_split_infos = eval_queue.dequeue()
+				self.eval_linear_targets, self.eval_targets_lengths, self.eval_split_infos, self.eval_input_emo_labels = eval_queue.dequeue()
 
 			self.eval_inputs.set_shape(self._placeholders[0].shape)
 			self.eval_input_lengths.set_shape(self._placeholders[1].shape)
@@ -107,6 +110,7 @@ class Feeder:
 			self.eval_linear_targets.set_shape(self._placeholders[4].shape)
 			self.eval_targets_lengths.set_shape(self._placeholders[5].shape)
 			self.eval_split_infos.set_shape(self._placeholders[6].shape)
+			self.eval_input_emo_labels.set_shape(self._placeholders[7].shape)
 
 	def start_threads(self, session):
 		self._session = session
@@ -122,14 +126,15 @@ class Feeder:
 		meta = self._test_meta[self._test_offset]
 		self._test_offset += 1
 
-		text = meta[5]
+		text = meta[6]
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_emo_label = emo_to_id(meta[5])
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None
-		return (input_data, mel_target, token_target, linear_target, len(mel_target))
+		return (input_data, mel_target, token_target, linear_target, len(mel_target), input_emo_label)
 
 	def make_test_batches(self):
 		start = time.time()
@@ -186,14 +191,15 @@ class Feeder:
 		meta = self._train_meta[self._train_offset]
 		self._train_offset += 1
 
-		text = meta[5]
+		text = meta[6]
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_emo_label = emo_to_id(meta[5])
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None
-		return (input_data, mel_target, token_target, linear_target, len(mel_target))
+		return (input_data, mel_target, token_target, linear_target, len(mel_target), input_emo_label)
 
 	def _prepare_batch(self, batches, outputs_per_step):
 		assert 0 == len(batches) % self._hparams.tacotron_num_gpus
@@ -207,8 +213,9 @@ class Feeder:
 		targets_lengths = None
 		split_infos = []
 
-		targets_lengths = np.asarray([x[-1] for x in batches], dtype=np.int32) #Used to mask loss
+		targets_lengths = np.asarray([x[-2] for x in batches], dtype=np.int32) #Used to mask loss
 		input_lengths = np.asarray([len(x[0]) for x in batches], dtype=np.int32)
+		input_emo_labels = np.asarray([x[-1] for x in batches], dtype=np.int32)
 
 		#Produce inputs/targets of variables lengths for different GPUs
 		for i in range(self._hparams.tacotron_num_gpus):
@@ -229,7 +236,7 @@ class Feeder:
 			split_infos.append([input_max_len, mel_target_max_len, token_target_max_len, linear_target_max_len])
 
 		split_infos = np.asarray(split_infos, dtype=np.int32)
-		return (inputs, input_lengths, mel_targets, token_targets, linear_targets, targets_lengths, split_infos)
+		return (inputs, input_lengths, mel_targets, token_targets, linear_targets, targets_lengths, split_infos, input_emo_labels)
 
 	def _prepare_inputs(self, inputs):
 		max_len = max([len(x) for x in inputs])

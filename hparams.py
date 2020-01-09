@@ -180,7 +180,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Style token layer
 	tacotron_style_transfer = True,
-	tacotron_n_style_token = 10,  # number of style tokens
+	tacotron_n_style_token = 6,  # number of style tokens
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
     tacotron_style_encoder_outputs_size = 512,  # dim of style token layer output

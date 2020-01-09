@@ -597,13 +597,21 @@ def multihead_attention(queries,
 
             paddings = tf.ones_like(masks) * (-2 ** 32 + 1)
             outputs = tf.where(tf.equal(masks, 0), paddings, outputs)  # (h*N, T_q, T_k)
+            
+        logits = outputs
+        # Restore shape
+        logits = tf.concat(tf.split(logits, num_heads, axis=0), axis=2)  # [N,T_q,C]
 
         # Activation
         outputs = tf.nn.softmax(outputs)  # (h*N, T_q, T_k)
 
         alignment = outputs
-        # Restore alignment shape
+        # Restore shape
         alignment = tf.concat(tf.split(alignment, num_heads, axis=0), axis=2)  # [N,T_q,C]
+
+        if input_alignment is not None:
+            alignment = input_alignment
+            outputs = input_alignment
 
         # Query Masking
         query_masks = tf.sign(tf.abs(tf.reduce_sum(queries, axis=-1)))  # (N, T_q)
@@ -614,13 +622,8 @@ def multihead_attention(queries,
         # Dropouts
         outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
-        if input_alignment is None:
-            # Weighted sum
-            _alignment = outputs
-            outputs = tf.matmul(outputs, V_)  # (h*N, T_q, C/h)
-        else:
-            _alignment = input_alignment
-            outputs = tf.matmul(input_alignment, V_)
+        # Weighted sum
+        outputs = tf.matmul(outputs, V_)  # (h*N, T_q, C/h)
 
         # Restore shape
         outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
@@ -633,7 +636,7 @@ def multihead_attention(queries,
         # Normalize
         # outputs = normalize(outputs)  # (N, T_q, C)
 
-    return outputs, _alignment
+    return outputs, logits, alignment
 
 
 class StyleTokenLayer:
@@ -650,6 +653,6 @@ class StyleTokenLayer:
             token_embedding = tf.nn.tanh(token_embedding)  # tanh activation before attention
             # print('x: {}'.format(x))
             # print('token_embedding: {}'.format(token_embedding))
-            x, alignment = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
-                                       is_training=self._is_training, num_heads=4, input_alignment=input_alignment)
-            return x, alignment
+            x, logits, alignment = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
+                                       is_training=self._is_training, num_heads=1, input_alignment=input_alignment)
+            return x, logits, alignment
