@@ -184,10 +184,15 @@ hparams = tf.contrib.training.HParams(
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
     tacotron_style_encoder_outputs_size = 512,  # dim of style token layer output
-    # tacotron_style_reference_audio = 'ref_audio/lin.wav.npy',
-    tacotron_style_reference_audio = 'ref_audio/story.wav',
+    # tacotron_style_reference_audio = None,
+    tacotron_style_reference_audio = 'ref_audio/sad.wav',
+	tacotron_style_encoder_output = None,
+	# tacotron_style_encoder_output = 'tacotron_tacoGST2/eval/arouse.wav-enc.npy',
+	tacotron_style_mh_alignment = None,
+	# tacotron_style_mh_alignment = 'tacotron_tacoGST2/eval/test.npy',
     # manually specify style token alignment weights instead of getting them from reference audio
     tacotron_style_alignment = None,
+    # tacotron_style_alignment = [0, 0, 0, 0, 0, 0, 0, -0.9, 0, 0],
 	###########################################################################################################################################
 
 	#Wavenet

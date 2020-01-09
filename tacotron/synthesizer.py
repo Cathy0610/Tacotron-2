@@ -3,8 +3,8 @@ import wave
 from datetime import datetime
 
 import numpy as np
-import pyaudio
-import sounddevice as sd
+# import pyaudio
+# import sounddevice as sd
 import tensorflow as tf
 from datasets import audio
 from infolog import log
@@ -38,6 +38,9 @@ class Synthesizer:
 			self.alignments = self.model.tower_alignments
 			self.stop_token_prediction = self.model.tower_stop_token_prediction
 			self.targets = targets
+			if hparams.tacotron_style_transfer:
+				self.style_alignments = self.model.tower_style_alignments
+				self.style_encoder_outputs = self.model.tower_style_encoder_outputs
 
 		if hparams.GL_on_GPU:
 			self.GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
@@ -125,8 +128,9 @@ class Synthesizer:
 			assert len(np_targets) == len(texts)
 
 
-		if hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None and \
-				hparams.tacotron_style_alignment is None:
+		if hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None:
+		# if hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None and \
+		# 		hparams.tacotron_style_alignment is None:
 			# only support one style reference audio
 			if hparams.tacotron_style_reference_audio[-4:].lower() == '.wav':
 				wav = audio.load_wav(hparams.tacotron_style_reference_audio, sr=hparams.sample_rate)
@@ -157,7 +161,11 @@ class Synthesizer:
 		feed_dict[self.split_infos] = np.asarray(split_infos, dtype=np.int32)
 
 		if self.gta or not hparams.predict_linear:
-			mels, alignments, stop_tokens = self.session.run([self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
+			if self._hparams.tacotron_style_transfer:
+				mels, alignments, stop_tokens, style_alignments, style_encoder_outputs = self.session.run([self.mel_outputs, self.alignments, self.stop_token_prediction, self.style_alignments, self.style_encoder_outputs], feed_dict=feed_dict)
+			else:
+				mels, alignments, stop_tokens = self.session.run([self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
+
 
 			#Linearize outputs (n_gpus -> 1D)
 			mels = [mel for gpu_mels in mels for mel in gpu_mels]
@@ -174,7 +182,10 @@ class Synthesizer:
 			assert len(mels) == len(texts)
 
 		else:
-			linears, mels, alignments, stop_tokens = self.session.run([self.linear_outputs, self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
+			if self._hparams.tacotron_style_transfer:
+				linears, mels, alignments, stop_tokens, style_alignments, style_encoder_outputs = self.session.run([self.linear_outputs, self.mel_outputs, self.alignments, self.stop_token_prediction, self.style_alignments, self.style_encoder_outputs], feed_dict=feed_dict)
+			else:
+				linears, mels, alignments, stop_tokens = self.session.run([self.linear_outputs, self.mel_outputs, self.alignments, self.stop_token_prediction], feed_dict=feed_dict)
 			
 			#Linearize outputs (1D arrays)
 			linears = [linear for gpu_linear in linears for linear in gpu_linear]
@@ -215,7 +226,12 @@ class Synthesizer:
 				raise RuntimeError('Your OS type is not supported yet, please add it to "tacotron/synthesizer.py, line-165" and feel free to make a Pull Request ;) Thanks!')
 
 			return
-
+			
+		# style_encoder_output[device_num, batch_size, sequence length, embedding_size]
+		if self._hparams.tacotron_style_transfer and self._hparams.tacotron_style_reference_audio is not None:
+			_basename = os.path.basename(self._hparams.tacotron_style_reference_audio)
+			np.save(os.path.join(out_dir, ('%s-enc.npy' % _basename)), style_encoder_outputs[0][0][0], allow_pickle=False)
+			np.save(os.path.join(out_dir, ('%s.npy' % _basename)), style_alignments[0], allow_pickle=False)
 
 		saved_mels_paths = []
 		speaker_ids = []
@@ -252,6 +268,7 @@ class Synthesizer:
 				plot.plot_spectrogram(mel, os.path.join(log_dir, 'plots/mel-{}.png'.format(basenames[i])),
 					title='{}'.format(texts[i]), split_title=True)
 
+				
 				if hparams.predict_linear:
 					#save wav (linear -> wav)
 					if hparams.GL_on_GPU:

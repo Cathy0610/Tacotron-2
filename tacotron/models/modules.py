@@ -537,6 +537,7 @@ def multihead_attention(queries,
                         keys,
                         num_units=None,
                         num_heads=8,
+						input_alignment=None,
                         dropout_rate=0.,
                         is_training=True,
                         causality=False,
@@ -613,8 +614,13 @@ def multihead_attention(queries,
         # Dropouts
         outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
-        # Weighted sum
-        outputs = tf.matmul(outputs, V_)  # (h*N, T_q, C/h)
+        if input_alignment is None:
+            # Weighted sum
+            _alignment = outputs
+            outputs = tf.matmul(outputs, V_)  # (h*N, T_q, C/h)
+        else:
+            _alignment = input_alignment
+            outputs = tf.matmul(input_alignment, V_)
 
         # Restore shape
         outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, C)
@@ -627,7 +633,7 @@ def multihead_attention(queries,
         # Normalize
         # outputs = normalize(outputs)  # (N, T_q, C)
 
-    return outputs, alignment
+    return outputs, _alignment
 
 
 class StyleTokenLayer:
@@ -636,7 +642,7 @@ class StyleTokenLayer:
         self._is_training = is_training
         self._scope = 'style_token' if scope is None else scope
 
-    def __call__(self, inputs, token_embedding):
+    def __call__(self, inputs, token_embedding, input_alignment=None):
         # inputs: [batch_size,1,hp.tacotron_reference_gru_hidden_size], query
         # output: [batch_size,1,attention_output_size]
         x = inputs
@@ -644,6 +650,6 @@ class StyleTokenLayer:
             token_embedding = tf.nn.tanh(token_embedding)  # tanh activation before attention
             # print('x: {}'.format(x))
             # print('token_embedding: {}'.format(token_embedding))
-            x, _ = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
-                                       is_training=self._is_training, num_heads=4)
-            return x
+            x, alignment = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
+                                       is_training=self._is_training, num_heads=4, input_alignment=input_alignment)
+            return x, alignment

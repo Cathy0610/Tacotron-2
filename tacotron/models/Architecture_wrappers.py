@@ -73,8 +73,8 @@ class TacotronReferenceEncoderCell:
         style_token_embedding = tf.tile(tf.expand_dims(style_token_embedding, axis=0),
                                         multiples=[batch_size, 1, 1])
         # state: [batch_size,1,hp.encoder_lstm_units * 2]
-        state = self._style_token_layer(state_, style_token_embedding)
-        return state
+        state, alignment = self._style_token_layer(state_, style_token_embedding)
+        return state, alignment
 
 class TacotronDecoderCellState(
 	collections.namedtuple("TacotronDecoderCellState",
