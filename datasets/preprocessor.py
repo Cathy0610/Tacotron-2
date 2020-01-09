@@ -63,7 +63,7 @@ def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir,
 	# optimization purposes and it can be omited
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
-	for in_dir in input_dirs:
+	for in_dir, label in input_dirs:
 		with open(os.path.join(in_dir, 'metadata.txt'), 'r', encoding='utf-8') as f:
 			lines = f.readlines()
 			# print(len(lines))
@@ -111,7 +111,7 @@ def build_from_path_databaker(hparams, input_dirs, mel_dir, linear_dir, wav_dir,
 				text = ' '.join(symbols)
 				# print(text)
 				
-				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, wavidx_raw, wav_path, text, hparams)))
+				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, wavidx_raw, wav_path, text, label, hparams)))
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
@@ -152,7 +152,7 @@ def build_from_path_databaker_os(hparams, input_dirs, mel_dir, linear_dir, wav_d
 
 
 
-def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hparams):
+def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, emo_label, hparams):
 	"""
 	Preprocesses a single utterance wav/text pair
 
@@ -166,6 +166,14 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		- index: the numeric index to use in the spectogram filename
 		- wav_path: path to the audio file containing the speech input
 		- text: text spoken in the input audio file
+		- emo_label: emotion label of the input audio
+			- 'N': neutral
+			- 'A': angry
+			- 'D': disgust
+			- 'F': fearful
+			- 'H': happy
+			- 'S': sad
+			- 'U': surprised
 		- hparams: hyper parameters
 
 	Returns:
@@ -273,4 +281,4 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 		np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
 
 	# Return a tuple describing this training example
-	return (audio_filename, mel_filename, linear_filename, time_steps, mel_frames, text)
+	return (audio_filename, mel_filename, linear_filename, time_steps, mel_frames, emo_label, text)
