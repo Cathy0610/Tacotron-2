@@ -190,10 +190,11 @@ hparams = tf.contrib.training.HParams(
 	# tacotron_style_encoder_output = 'tacotron_tacoGST2/eval/arouse.wav-enc.npy',
 	# tacotron_style_mh_alignment = None,
 	# tacotron_style_mh_alignment = 'tacotron_tacoGST2/eval/test.npy',
-	tacotron_style_mh_alignment = [1, 0, 0, 0, 0, 0],
+	# tacotron_style_mh_alignment = [[[0, 0, 0, 0, 1, 0, 0, 0, 0, 0]]]*4,
+	tacotron_style_mh_alignment = [[[1, 0, 0, 0, 0, 0]]],
     # manually specify style token alignment weights instead of getting them from reference audio
     tacotron_style_alignment = None,
-    # tacotron_style_alignment = [0, 0, 0, 0, 0, 0, 0, -0.9, 0, 0],
+    # tacotron_style_alignment = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
 	###########################################################################################################################################
 
 	#Wavenet

@@ -609,9 +609,6 @@ def multihead_attention(queries,
         # Restore shape
         alignment = tf.concat(tf.split(alignment, num_heads, axis=0), axis=2)  # [N,T_q,C]
 
-        if input_alignment is not None:
-            alignment = input_alignment
-            outputs = input_alignment
 
         # Query Masking
         query_masks = tf.sign(tf.abs(tf.reduce_sum(queries, axis=-1)))  # (N, T_q)
@@ -619,6 +616,10 @@ def multihead_attention(queries,
         query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1, 1, tf.shape(keys)[1]])  # (h*N, T_q, T_k)
         outputs *= query_masks  # broadcasting. (N, T_q, C)
 
+        if input_alignment is not None:
+            alignment = input_alignment
+            outputs = input_alignment
+        
         # Dropouts
         outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
 
