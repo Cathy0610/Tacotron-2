@@ -191,7 +191,7 @@ class Tacotron():
 							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[batch_size, seq_len, 1])
 							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
 						elif hp.tacotron_style_mh_alignment is not None:
-							input_alignment = tf.convert_to_tensor(np.load(hp.tacotron_style_mh_alignment), dtype=tf.float32)
+							input_alignment = tf.convert_to_tensor(hp.tacotron_style_mh_alignment, dtype=tf.float32)
 							style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
 												is_training=is_training)
 							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
@@ -368,8 +368,8 @@ class Tacotron():
 			log('  device:                   {}'.format(i))
 			log('  embedding:                {}'.format(tower_embedded_inputs[i].shape))
 			log('  enc conv out:             {}'.format(tower_enc_conv_output_shape[i]))
-			log('  emo label:                {}'.format(self.tower_input_emo_labels[i].shape))
-			log('  style logits:            {}'.format(self.tower_style_logits[i].shape))
+			# log('  emo label:                {}'.format(self.tower_input_emo_labels[i].shape))
+			# log('  style logits:            {}'.format(self.tower_style_logits[i].shape))
 			log('  encoder out:              {}'.format(tower_encoder_outputs[i].shape))
 			log('  decoder out:              {}'.format(self.tower_decoder_output[i].shape))
 			log('  residual out:             {}'.format(tower_residual[i].shape))
