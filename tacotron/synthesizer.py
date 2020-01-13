@@ -200,10 +200,10 @@ class Synthesizer:
 			#Take off the batch wise padding
 			mels = [mel[:target_length, :] for mel, target_length in zip(mels, target_lengths)]
 			linears = [linear[:target_length, :] for linear, target_length in zip(linears, target_lengths)]
-			linears = np.clip(linears, T2_output_range[0], T2_output_range[1])
+			linears = [np.clip(linear, T2_output_range[0], T2_output_range[1]) for linear in linears]
 			assert len(mels) == len(linears) == len(texts)
 
-		mels = np.clip(mels, T2_output_range[0], T2_output_range[1])
+		mels = [np.clip(mel, T2_output_range[0], T2_output_range[1]) for mel in mels]
 
 		if basenames is None:
 			#Generate wav and read it
@@ -305,5 +305,6 @@ class Synthesizer:
 
 	def _get_output_lengths(self, stop_tokens):
 		#Determine each mel length by the stop token predictions. (len = first occurence of 1 in stop_tokens row wise)
-		output_lengths = [row.index(1) if 1 in row else len(row) for row in np.round(stop_tokens).tolist()]
+		output_lengths = [np.round(token).tolist() for token in stop_tokens]
+		output_lengths = [row.index(1) if 1 in row else len(row) for row in output_lengths]
 		return output_lengths
