@@ -641,10 +641,11 @@ def multihead_attention(queries,
 
 
 class StyleTokenLayer:
-    def __init__(self, output_size, is_training=True, scope=None):
+    def __init__(self, output_size, is_training=True, scope=None, num_heads=4):
         self._output_size = output_size
         self._is_training = is_training
         self._scope = 'style_token' if scope is None else scope
+        self._num_heads = num_heads
 
     def __call__(self, inputs, token_embedding, input_alignment=None):
         # inputs: [batch_size,1,hp.tacotron_reference_gru_hidden_size], query
@@ -655,5 +656,5 @@ class StyleTokenLayer:
             # print('x: {}'.format(x))
             # print('token_embedding: {}'.format(token_embedding))
             x, logits, alignment = multihead_attention(queries=x, keys=token_embedding, num_units=self._output_size, dropout_rate=0.5,
-                                       is_training=self._is_training, num_heads=1, input_alignment=input_alignment)
+                                       is_training=self._is_training, num_heads=self._num_heads, input_alignment=input_alignment)
             return x, logits, alignment

@@ -1,7 +1,11 @@
 .*
 LICENSE
 *.md
-zh*.txt
 docker
 logs*
 papers
+training_data*
+tacotron_*
+ref_audio
+mel_GT
+__pycache__

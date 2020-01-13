@@ -106,7 +106,7 @@ venv.bak/
 # Tacotron 2 oddities
 logs-*
 tacotron_*/
-training_data*/
+training_*/
 
 # ground truth mel-scale
 mel_GT/
