@@ -17,7 +17,10 @@ def preprocess(args, input_folders, out_dir, hparams):
 	if args.dataset.startswith('databaker'):
 		if args.dataset.startswith('databaker_os'):
 			metadata = preprocessor.build_from_path_databaker_os(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
-		metadata = preprocessor.build_from_path_databaker(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+		elif args.dataset.startswith('databaker_en'):
+			metadata = preprocessor.build_from_path_databaker_en(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm, lang=hparams.tacotron_lang)
+		else:
+			metadata = preprocessor.build_from_path_databaker(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	else:
 		metadata = preprocessor.build_from_path(hparams, input_folders, mel_dir, linear_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	write_metadata(metadata, out_dir)
@@ -41,13 +44,16 @@ def norm_data(args):
 	merge_books = (args.merge_books=='True')
 
 	print('Selecting data folders..')
-	supported_datasets = ['databaker', 'databaker_os', 'LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
+	supported_datasets = ['databaker', 'databaker_en', 'databaker_en_cmu', 'databaker_os', 'LJSpeech-1.0', 'LJSpeech-1.1', 'M-AILABS']
 	if args.dataset not in supported_datasets:
 		raise ValueError('dataset value entered {} does not belong to supported datasets: {}'.format(
 			args.dataset, supported_datasets))
 
 	if args.dataset.startswith('databaker_os'):
-		return [os.path.expanduser('~/DataBaker')]
+		return [(os.path.expanduser('~/DataBaker'), 'N')]
+	
+	if args.dataset.startswith('databaker_en'):
+		return [(os.path.expanduser('~/DB-6/EN'), 'N')]
 	
 	if args.dataset.startswith('databaker'):
 		return [(os.path.expanduser(path[0]), path[1]) for path in [
@@ -58,7 +64,7 @@ def norm_data(args):
 			('~/DB-6-Emo/DB-TTS-040-2/happy', 'H'),
 			('~/DB-6-Emo/DB-TTS-040-2/sad', 'S')
 		]]
-
+	
 	if args.dataset.startswith('LJSpeech'):
 		return [os.path.join(args.base_dir, args.dataset)]
 

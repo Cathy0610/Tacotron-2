@@ -128,7 +128,7 @@ class Feeder:
 
 		text = meta[6]
 
-		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.tacotron_lang), dtype=np.int32)
 		input_emo_label = emo_to_id(meta[5])
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
@@ -193,7 +193,7 @@ class Feeder:
 
 		text = meta[6]
 
-		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.tacotron_lang), dtype=np.int32)
 		input_emo_label = emo_to_id(meta[5])
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence

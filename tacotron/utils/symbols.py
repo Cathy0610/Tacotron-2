@@ -8,7 +8,7 @@ from . import cmudict
 
 _pad        = '_'
 _eos        = '~'
-# _characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\'\"(),-.:;? '
+_characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\'\"(),-.:;? %/'
 
 # _phone = [' ', \
 #             'a1', 'a2', 'a3', 'a4', 'a5', \
@@ -63,6 +63,7 @@ _eos        = '~'
 #             'vv', 'w', 'x', 'y', 'z', 'zh']
 
 _sep = '.'
+_slash = '/'
 _prosodic_struct = ['1', '2', '3', '4']
 _initials = ['b', 'p', 'f', 'm', \
             'd', 't', 'n', 'l', \
@@ -109,3 +110,7 @@ def phonesplit(pinyin):
 # Export all symbols:
 # symbols = [_pad, _eos] + list(_characters) #+ _arpabet
 symbols = [_pad, _eos, _sep] + _initials + _finals + _prosodic_struct + cmudict.valid_symbols
+
+en_symbols = [_pad, _eos, _sep] + list(_characters)
+
+cmu_symbols = [_pad, _eos, _sep, _slash] + cmudict.valid_symbols

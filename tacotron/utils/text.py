@@ -1,17 +1,33 @@
 import re
 
 from . import cleaners
-from .symbols import symbols, phonesplit
+from .symbols import symbols, phonesplit, en_symbols, cmu_symbols
 
 # Mappings from symbol to numeric ID and vice versa:
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _id_to_symbol = {i: s for i, s in enumerate(symbols)}
+_cur_lang = 'zh'
+
+def _change_lang(lang):
+  global _cur_lang, _symbol_to_id, _id_to_symbol
+  if _cur_lang != lang:
+    if lang == 'zh':
+      _symbol_to_id = {s: i for i, s in enumerate(symbols)}
+      _id_to_symbol = {i: s for i, s in enumerate(symbols)}
+    elif lang == 'en':
+      _symbol_to_id = {s: i for i, s in enumerate(en_symbols)}
+      _id_to_symbol = {i: s for i, s in enumerate(en_symbols)}
+    elif lang == 'cmu':
+      _symbol_to_id = {s: i for i, s in enumerate(cmu_symbols)}
+      _id_to_symbol = {i: s for i, s in enumerate(cmu_symbols)}
+    _cur_lang = lang
+
 
 # Regular expression matching text enclosed in curly braces:
 _curly_re = re.compile(r'(.*?)\{(.+?)\}(.*)')
 
 
-def text_to_sequence(text, cleaner_names):
+def text_to_sequence(text, cleaner_names, lang='zh'):
   '''Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
 
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
@@ -24,10 +40,14 @@ def text_to_sequence(text, cleaner_names):
     Returns:
       List of integers corresponding to the symbols in the text
   '''
+  _change_lang(lang)
+
   sequence = []
 
   # text = _clean_text(text, cleaner_names)
-  symbolsequence = text.split()
+  symbolsequence = text.split() if lang != 'en' else list(text)
+  if lang == 'cmu':
+    symbolsequence = [symbol.rstrip('3') for symbol in symbolsequence]
   
   for s in symbolsequence:
     if _should_keep_symbol(s):
@@ -50,8 +70,9 @@ def text_to_sequence(text, cleaner_names):
   return sequence
 
 
-def sequence_to_text(sequence):
+def sequence_to_text(sequence, lang='zh'):
   '''Converts a sequence of IDs back to a string'''
+  _change_lang(lang)
   result = ''
   for symbol_id in sequence:
     if symbol_id in _id_to_symbol:
@@ -74,7 +95,6 @@ def _clean_text(text, cleaner_names):
 
 def _symbols_to_sequence(symbols):
   return [_symbol_to_id[s] for s in symbols if _should_keep_symbol(s)]
-
 
 def _arpabet_to_sequence(text):
   return _symbols_to_sequence(['@' + s for s in text.split()])
