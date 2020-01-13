@@ -58,6 +58,8 @@ def norm_data(args):
 	if args.dataset.startswith('databaker'):
 		return [(os.path.expanduser(path[0]), path[1]) for path in [
 			('~/DB-6/000001-010000', 'N'),
+			('~/DB-6-Emo/DB-TTS-040/happy', 'H'),
+			('~/DB-6-Emo/DB-TTS-040/sad', 'S'),
 			('~/DB-6-Emo/DB-TTS-040-2/angry', 'A'),
 			('~/DB-6-Emo/DB-TTS-040-2/disgust', 'D'),
 			('~/DB-6-Emo/DB-TTS-040-2/fear', 'F'),
