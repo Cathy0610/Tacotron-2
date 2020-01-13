@@ -1,6 +1,6 @@
 import re
 
-from . import cleaners
+# from . import cleaners
 from .symbols import symbols, phonesplit, en_symbols, cmu_symbols
 
 # Mappings from symbol to numeric ID and vice versa:
