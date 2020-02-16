@@ -64,7 +64,11 @@ def norm_data(args):
 			('~/DB-6-Emo/DB-TTS-040-2/disgust', 'D'),
 			('~/DB-6-Emo/DB-TTS-040-2/fear', 'F'),
 			('~/DB-6-Emo/DB-TTS-040-2/happy', 'H'),
-			('~/DB-6-Emo/DB-TTS-040-2/sad', 'S')
+			('~/DB-6-Emo/DB-TTS-040-2/sad', 'S'),
+			('~/DB-6-Emo/DB-TTS-040-3/angry', 'A'),
+			('~/DB-6-Emo/DB-TTS-040-3/disgust', 'D'),
+			('~/DB-6-Emo/DB-TTS-040-3/fear', 'F'),
+			('~/DB-6-Emo/DB-TTS-040-3/suprise', 'U')
 		]]
 	
 	if args.dataset.startswith('LJSpeech'):

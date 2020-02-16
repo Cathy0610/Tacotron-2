@@ -55,6 +55,7 @@ def add_train_stats(model, hparams):
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
+		tf.summary.scalar('emo_loss', model.emo_loss)
 		tf.summary.scalar('learning_rate', model.learning_rate) #Control learning rate decay speed
 		if hparams.tacotron_teacher_forcing_mode == 'scheduled':
 			tf.summary.scalar('teacher_forcing_ratio', model.ratio) #Control teacher forcing ratio decay when mode = 'scheduled'
