@@ -4,7 +4,6 @@ from functools import partial
 
 import numpy as np
 from datasets import audio
-from wavenet_vocoder.util import is_mulaw, is_mulaw_quantize, mulaw, mulaw_quantize
 
 
 def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
@@ -77,30 +76,10 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	if hparams.trim_silence:
 		wav = audio.trim_silence(wav, hparams)
 
-	#Mu-law quantize
-	if is_mulaw_quantize(hparams.input_type):
-		#[0, quantize_channels)
-		out = mulaw_quantize(wav, hparams.quantize_channels)
-
-		#Trim silences
-		start, end = audio.start_and_end_indices(out, hparams.silence_threshold)
-		wav = wav[start: end]
-		out = out[start: end]
-
-		constant_values = mulaw_quantize(0, hparams.quantize_channels)
-		out_dtype = np.int16
-
-	elif is_mulaw(hparams.input_type):
-		#[-1, 1]
-		out = mulaw(wav, hparams.quantize_channels)
-		constant_values = mulaw(0., hparams.quantize_channels)
-		out_dtype = np.float32
-
-	else:
-		#[-1, 1]
-		out = wav
-		constant_values = 0.
-		out_dtype = np.float32
+	#[-1, 1]
+	out = wav
+	constant_values = 0.
+	out_dtype = np.float32
 
 	# Compute the mel scale spectrogram from the wav
 	mel_spectrogram = audio.melspectrogram(wav, hparams).astype(np.float32)
