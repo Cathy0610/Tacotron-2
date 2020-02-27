@@ -216,3 +216,56 @@ def _denormalize(D, hparams):
 		return (((D + hparams.max_abs_value) * -hparams.min_level_db / (2 * hparams.max_abs_value)) + hparams.min_level_db)
 	else:
 		return ((D * -hparams.min_level_db / hparams.max_abs_value) + hparams.min_level_db)
+
+
+def wav2spectrograms(wav, hparams):
+	"""
+	Process the wav data and generate the mel, linear specgrogram
+
+	Returns:
+		- A tuple: (audio_data, mel_spectrogram, linear_spectrogram, time_steps, mel_frames)
+	"""
+
+	#[-1, 1]
+	out = wav
+	constant_values = 0.
+
+	# Compute the mel scale spectrogram from the wav
+	mel_spectrogram = melspectrogram(wav, hparams).astype(np.float32)
+	mel_frames = mel_spectrogram.shape[1]
+
+	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
+		return None
+
+	#Compute the linear scale spectrogram from the wav
+	linear_spectrogram = linearspectrogram(wav, hparams).astype(np.float32)
+	linear_frames = linear_spectrogram.shape[1]
+
+	#sanity check
+	assert linear_frames == mel_frames
+
+	if hparams.use_lws:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
+		l, r = pad_lr(wav, fft_size, get_hop_size(hparams))
+
+		#Zero pad audio signal
+		out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
+	else:
+		#Ensure time resolution adjustement between audio and mel-spectrogram
+		pad = librosa_pad_lr(wav, hparams.n_fft, get_hop_size(hparams))
+
+		#Reflect pad audio signal (Just like it's done in Librosa to avoid frame inconsistency)
+		out = np.pad(out, pad, mode='reflect')
+
+	assert len(out) >= mel_frames * get_hop_size(hparams)
+
+	#time resolution adjustement
+	#ensure length of raw audio is multiple of hop size so that we can use
+	#transposed convolution to upsample
+	out = out[:mel_frames * get_hop_size(hparams)]
+	assert len(out) % get_hop_size(hparams) == 0
+	time_steps = len(out)
+
+	return (out, mel_spectrogram, linear_spectrogram, time_steps, mel_frames)
+

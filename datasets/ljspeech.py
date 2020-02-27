@@ -1,12 +1,12 @@
-import os
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 
 import numpy as np
+import os
 from datasets import audio
 
 
-def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
+def build_from_path(hparams, input_dir, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
 	Preprocesses the speech dataset from a gven input path to given output directories
 
@@ -28,15 +28,14 @@ def build_from_path(hparams, input_dirs, mel_dir, linear_dir, wav_dir, n_jobs=12
 	executor = ProcessPoolExecutor(max_workers=n_jobs)
 	futures = []
 	index = 1
-	for input_dir in input_dirs:
-		with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
-			for line in f:
-				parts = line.strip().split('|')
-				basename = parts[0]
-				wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(basename))
-				text = parts[2]
-				futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, basename, wav_path, text, hparams)))
-				index += 1
+	with open(os.path.join(input_dir, 'metadata.csv'), encoding='utf-8') as f:
+		for line in f:
+			parts = line.strip().split('|')
+			basename = parts[0]
+			wav_path = os.path.join(input_dir, 'wavs', '{}.wav'.format(basename))
+			text = parts[2]
+			futures.append(executor.submit(partial(_process_utterance, mel_dir, linear_dir, wav_dir, basename, wav_path, text, hparams)))
+			index += 1
 
 	return [future.result() for future in tqdm(futures) if future.result() is not None]
 
@@ -76,53 +75,21 @@ def _process_utterance(mel_dir, linear_dir, wav_dir, index, wav_path, text, hpar
 	if hparams.trim_silence:
 		wav = audio.trim_silence(wav, hparams)
 
-	#[-1, 1]
-	out = wav
-	constant_values = 0.
-	out_dtype = np.float32
-
-	# Compute the mel scale spectrogram from the wav
-	mel_spectrogram = audio.melspectrogram(wav, hparams).astype(np.float32)
-	mel_frames = mel_spectrogram.shape[1]
-
-	if mel_frames > hparams.max_mel_frames and hparams.clip_mels_length:
+	#Get spectrogram from wav
+	ret = audio.wav2spectrograms(wav, hparams)
+	if ret is None:
 		return None
-
-	#Compute the linear scale spectrogram from the wav
-	linear_spectrogram = audio.linearspectrogram(wav, hparams).astype(np.float32)
-	linear_frames = linear_spectrogram.shape[1]
-
-	#sanity check
-	assert linear_frames == mel_frames
-
-	if hparams.use_lws:
-		#Ensure time resolution adjustement between audio and mel-spectrogram
-		fft_size = hparams.n_fft if hparams.win_size is None else hparams.win_size
-		l, r = audio.pad_lr(wav, fft_size, audio.get_hop_size(hparams))
-
-		#Zero pad audio signal
-		out = np.pad(out, (l, r), mode='constant', constant_values=constant_values)
-	else:
-		#Ensure time resolution adjustement between audio and mel-spectrogram
-		pad = audio.librosa_pad_lr(wav, hparams.n_fft, audio.get_hop_size(hparams))
-
-		#Reflect pad audio signal (Just like it's done in Librosa to avoid frame inconsistency)
-		out = np.pad(out, pad, mode='reflect')
-
-	assert len(out) >= mel_frames * audio.get_hop_size(hparams)
-
-	#time resolution adjustement
-	#ensure length of raw audio is multiple of hop size so that we can use
-	#transposed convolution to upsample
-	out = out[:mel_frames * audio.get_hop_size(hparams)]
-	assert len(out) % audio.get_hop_size(hparams) == 0
-	time_steps = len(out)
+	out = ret[0]
+	mel_spectrogram = ret[1]
+	linear_spectrogram = ret[2]
+	time_steps = ret[3]
+	mel_frames = ret[4]
 
 	# Write the spectrogram and audio to disk
 	audio_filename = 'audio-{}.npy'.format(index)
 	mel_filename = 'mel-{}.npy'.format(index)
 	linear_filename = 'linear-{}.npy'.format(index)
-	np.save(os.path.join(wav_dir, audio_filename), out.astype(out_dtype), allow_pickle=False)
+	np.save(os.path.join(wav_dir, audio_filename), out.astype(np.float32), allow_pickle=False)
 	np.save(os.path.join(mel_dir, mel_filename), mel_spectrogram.T, allow_pickle=False)
 	np.save(os.path.join(linear_dir, linear_filename), linear_spectrogram.T, allow_pickle=False)
 
