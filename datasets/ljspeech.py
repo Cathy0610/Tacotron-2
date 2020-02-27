@@ -8,7 +8,11 @@ from datasets import audio
 
 def build_from_path(hparams, input_dir, mel_dir, linear_dir, wav_dir, n_jobs=12, tqdm=lambda x: x):
 	"""
-	Preprocesses the speech dataset from a gven input path to given output directories
+	Preprocesses the LJ speech format dataset from a gven input path to given output directories
+
+		LJSpeech-1.1
+			├── metadata.csv ('|' separated metadata: wav_file_name|raw text|text)
+			└── wavs         (dir storing wav files)
 
 	Args:
 		- hparams: hyper parameters

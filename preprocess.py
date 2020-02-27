@@ -5,6 +5,7 @@ from multiprocessing import cpu_count
 from hparams import hparams
 from tqdm import tqdm
 from datasets import ljspeech
+from datasets import databaker
 
 
 def write_metadata(metadata, out_dir):
@@ -49,8 +50,11 @@ def main():
 	metadata = []
 	if args.dataset == 'LJSpeech-1.1':
 		metadata = ljspeech.build_from_path(modified_hp, in_dir, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	elif args.dataset == 'DataBaker':
+		use_prosody = False
+		metadata = databaker.build_from_path(modified_hp, in_dir, use_prosody, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	else:
-		raise ValueError('Unsupported dataset provided {} '.format(args.dataset))
+		raise ValueError('Unsupported dataset provided: {} '.format(args.dataset))
 	
 	# Write metadata to 'train.txt' for training
 	write_metadata(metadata, out_dir)
