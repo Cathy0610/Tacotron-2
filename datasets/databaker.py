@@ -93,7 +93,7 @@ def _parse_cn_prosody_label(text, pinyin, use_prosody=False):
 		return (None, None)
 
 	# remove punctuations
-	text = re.sub('[“”、，。：；？！—…#]', '', text)
+	text = re.sub('[“”、，。：；？！—…#（）]', '', text)
 
 	# split into sub-terms
 	sen_id, texts  = text.split()

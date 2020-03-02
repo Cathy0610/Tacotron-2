@@ -27,7 +27,7 @@ _initials = ['b', 'p', 'f', 'm', \
              'zh', 'ch', 'sh', 'r', \
              'z', 'c', 's']
 
-# Mandarin finals (普通话韵律列表)
+# Mandarin finals (普通话韵母列表)
 _finals = ['a',  'ai', 'ao',  'an',  'ang', \
            'o',  'ou', 'ong', \
            'e',  'ei', 'en',  'eng', 'er', 'ev', \
@@ -65,6 +65,7 @@ def split_pinyin(pinyin):
 	'''
 
   # retrieve tone
+  input = pinyin
   if pinyin[-1] >= '0' and pinyin[-1] <= '9':
     tone = pinyin[-1]
     if tone == '0':
@@ -122,9 +123,9 @@ def split_pinyin(pinyin):
     # ju->jv, jue->jve, juan->jvan, jun->jvn,
     # qu->qv, que->qve, quan->qvan, qun->qvn,
     # xu->xv, xue->xve, xuan->xvan, xun->xvn
-    # change all 'u' to 'v'
-    elif initial in ['j', 'q', 'x']:
-      final = final.replace('u', 'v')
+    # change all leading 'u' to 'v'
+    elif initial in ['j', 'q', 'x'] and final[0] == 'u':
+      final = 'v' + final[1:]
     # ui->uei
     # iu->iou
     # un->uen
@@ -134,14 +135,18 @@ def split_pinyin(pinyin):
       final = 'iou'
     elif final == 'un':
       final = 'uen'
-  # special process for final "m, n", not to be confused with initial "m, n"
-  # must be after getting the final, as full pinyin might be "hng", "hm", "ng", "m", "n"
-  # m->mm
-  # n->nn
-  if final == 'm':
-    final = 'mm'
-  if final == 'n':
-    final = 'nn'
+  # special process for final "ng, m, n"
+  # full pinyin might be "hng", "hm", "ng", "m", "n"
+  # as there are to few samples, treat final "m, n" as initial, and "ng" as "n"
+  if final == 'ng':
+    final ='n'
+
+  # keep the original input, if it is not Pinyin
+  if initial not in symbols or final not in symbols:
+    final = input
+    initial = ''
+    retroflex = ''
+    tone = ''
 
   return (initial, final, retroflex, tone)
 
