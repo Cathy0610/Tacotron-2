@@ -34,7 +34,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Both Tacotron and WaveNet can be trained on multi-GPU: data parallelization)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
-	tacotron_num_gpus = 1, #Determines the number of gpus in use for Tacotron training.
+	tacotron_num_gpus = 4, #Determines the number of gpus in use for Tacotron training.
 	wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training.
 	split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used. 
 		#(Recommend: False on slow CPUs/Disks, True otherwise for small speed boost)
@@ -61,8 +61,8 @@ hparams = tf.contrib.training.HParams(
 	#		.ipynb provided in the repo to listen to some inverted mel/linear spectrograms. That will first give you some idea about your above parameters, and
 	#		it will also give you an idea about trimming. If silences persist, try reducing trim_top_db slowly. If samples are trimmed mid words, try increasing it.
 	#	6- If audio quality is too metallic or fragmented (or if linear spectrogram plots are showing black silent regions on top), then restart from step 2.
-	num_mels = 80, #Number of mel-spectrogram channels and local conditioning dimensionality
-	num_freq = 2049, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
+	num_mels = 20, #Number of mel-spectrogram channels and local conditioning dimensionality
+	num_freq = 513, # (= n_fft / 2 + 1) only used when adding linear spectrograms post processing network
 	rescale = True, #Whether to rescale audio prior to preprocessing
 	rescaling_max = 0.999, #Rescaling value
 
@@ -77,10 +77,10 @@ hparams = tf.contrib.training.HParams(
 	silence_threshold=2, #silence threshold used for sound trimming for wavenet preprocessing
 
 	#Mel spectrogram
-	n_fft = 4096, #Extra window size is filled with 0 paddings to match this parameter
-	hop_size = 600, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
-	win_size = 2400, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
-	sample_rate = 48000, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
+	n_fft = 1024, #Extra window size is filled with 0 paddings to match this parameter
+	hop_size = 256, #For 22050Hz, 275 ~= 12.5 ms (0.0125 * sample_rate)
+	win_size = 800, #For 22050Hz, 1100 ~= 50 ms (If None, win_size = n_fft) (0.05 * sample_rate)
+	sample_rate = 16000, #22050 Hz (corresponding to ljspeech dataset) (sox --i <filename>)
 	frame_shift_ms = None, #Can replace hop_size parameter. (Recommended: 12.5)
 	magnitude_power = 2., #The power of the spectrogram magnitude (1. for energy, 2. for power)
 
@@ -179,14 +179,14 @@ hparams = tf.contrib.training.HParams(
 	predict_linear = False, #Whether to add a post-processing network to the Tacotron to predict linear spectrograms (True mode Not tested!!)
 
 	#Style token layer
-	tacotron_lang = 'cmu', # zh / en / cmu(en)
-	tacotron_style_transfer = False,
-	tacotron_style_label = False,
-	tacotron_n_style_token = 10,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
+	tacotron_lang = 'zh', # zh / en / cmu(en)
+	tacotron_style_transfer = True,
+	tacotron_style_label = True,
+	tacotron_n_style_token = 7,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
     tacotron_style_encoder_outputs_size = 512,  # dim of style token layer output
-	tacotron_style_attention_num_heads = 4,
+	tacotron_style_attention_num_heads = 1,
     tacotron_style_reference_audio = None,
     # tacotron_style_reference_audio = 'ref_audio/story.wav',
 	tacotron_style_encoder_output = None,
@@ -194,7 +194,7 @@ hparams = tf.contrib.training.HParams(
     # manually specify style token alignment weights instead of getting them from reference audio
 	tacotron_style_mh_alignment = None,
 	# tacotron_style_mh_alignment = [[[0, 0, 0, 0, 1, 0, 0, 0, 0, 0]]]*4,
-	# tacotron_style_mh_alignment = [[[1, 0, 0, 0, 0, 0]]],
+	# tacotron_style_mh_alignment = [[[0, 0, 0, 0, 0, 5, 0]]],
     tacotron_style_alignment = None,
     # tacotron_style_alignment = [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
 	###########################################################################################################################################
@@ -266,10 +266,10 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	#train/test split ratios, mini-batches sizes
-	tacotron_batch_size = 32, #number of training samples on each training steps
+	tacotron_batch_size = 32*4, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing). 
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
-	tacotron_synthesis_batch_size = 1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
+	tacotron_synthesis_batch_size = 1*3, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
 	tacotron_test_size = 0.05, #% of data to keep as test data, if None, tacotron_test_batches must be not None. (5% is enough to have a good idea about overfit)
 	tacotron_test_batches = None, #number of test batches.
 

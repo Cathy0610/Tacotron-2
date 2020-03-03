@@ -10,6 +10,7 @@ from infolog import log
 from tacotron.synthesizer import Synthesizer
 from tqdm import tqdm
 
+import numpy as np
 
 def generate_fast(model, text):
 	model.synthesize([text], None, None, None, None)
@@ -65,6 +66,10 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 			start = time.time()
 			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
 			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
+			for mel_filename in mel_filenames:
+				npy_data = np.load(mel_filename)
+				npy_data = npy_data.reshape((-1,))
+				npy_data.tofile("%s.f32" % mel_filename)
 
 			for elems in zip(texts, mel_filenames, speaker_ids):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
