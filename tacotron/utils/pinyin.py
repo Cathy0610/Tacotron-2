@@ -135,11 +135,13 @@ def split_pinyin(pinyin):
       final = 'iou'
     elif final == 'un':
       final = 'uen'
-  # special process for final "ng, m, n"
+  # special process for final "ng, m, n, ev"
   # full pinyin might be "hng", "hm", "ng", "m", "n"
-  # as there are to few samples, treat final "m, n" as initial, and "ng" as "n"
+  # as there are to few samples, treat final "m, n" as initial, and "ng" as "n", and "ev" as "ei"
   if final == 'ng':
-    final ='n'
+    final = 'n'
+  if final == 'ev':
+    final = 'ei'
 
   # keep the original input, if it is not Pinyin
   if initial not in symbols or final not in symbols:
