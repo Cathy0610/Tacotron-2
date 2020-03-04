@@ -6,6 +6,7 @@ from hparams import hparams
 from tqdm import tqdm
 from datasets import ljspeech
 from datasets import databaker
+from datasets import thcoss
 
 
 def write_metadata(metadata, out_dir):
@@ -51,8 +52,11 @@ def main():
 	if args.dataset == 'LJSpeech-1.1':
 		metadata = ljspeech.build_from_path(modified_hp, in_dir, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	elif args.dataset == 'DataBaker':
-		use_prosody = False
+		use_prosody = True
 		metadata = databaker.build_from_path(modified_hp, in_dir, use_prosody, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	elif args.dataset == 'THCoSS':
+		use_prosody = True
+		metadata = thcoss.build_from_path(modified_hp, in_dir, use_prosody, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	else:
 		raise ValueError('Unsupported dataset provided: {} '.format(args.dataset))
 	
