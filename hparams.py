@@ -67,7 +67,7 @@ hparams = tf.contrib.training.HParams(
 	rescaling_max = 0.999, #Rescaling value
 
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of generating consistent speech.
-	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
+	clip_mels_length = False, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
 	max_mel_frames = 900,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
@@ -85,15 +85,15 @@ hparams = tf.contrib.training.HParams(
 	magnitude_power = 2., #The power of the spectrogram magnitude (1. for energy, 2. for power)
 
 	#M-AILABS (and other datasets) trim params (there parameters are usually correct for any data, but definitely must be tuned for specific speakers)
-	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
+	trim_silence = False, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	trim_fft_size = 2048, #Trimming window size
 	trim_hop_size = 512, #Trimmin hop length
 	trim_top_db = 40, #Trimming db difference from reference db (smaller==harder trim.)
 
 	#Mel and Linear spectrograms normalization/scaling and clipping
-	signal_normalization = True, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
-	allow_clipping_in_normalization = True, #Only relevant if mel_normalization = True
-	symmetric_mels = True, #Whether to scale the data to be symmetric around 0. (Also multiplies the output range by 2, faster and cleaner convergence)
+	signal_normalization = False, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
+	allow_clipping_in_normalization = False, #Only relevant if mel_normalization = True
+	symmetric_mels = False, #Whether to scale the data to be symmetric around 0. (Also multiplies the output range by 2, faster and cleaner convergence)
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] (Must not be too big to avoid gradient explosion, 
 																										  #not too small for fast convergence)
 	normalize_for_wavenet = True, #whether to rescale to [0, 1] for wavenet. (better audio quality)
@@ -122,7 +122,7 @@ hparams = tf.contrib.training.HParams(
 	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 	batch_norm_position = 'after', #Can be in ('before', 'after'). Determines whether we use batch norm before or after the activation function (relu). Matter for debate.
-	clip_outputs = True, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
+	clip_outputs = False, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
 	lower_bound_decay = 0.1, #Small regularizer for noise synthesis by adding small range of penalty for silence regions. Set to 0 to clip in Tacotron range.
 
 	#Input parameters
@@ -180,8 +180,8 @@ hparams = tf.contrib.training.HParams(
 
 	#Style token layer
 	tacotron_lang = 'zh', # zh / en / cmu(en)
-	tacotron_style_transfer = True,
-	tacotron_style_label = True,
+	tacotron_style_transfer = False,
+	tacotron_style_label = False,
 	tacotron_n_style_token = 7,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
