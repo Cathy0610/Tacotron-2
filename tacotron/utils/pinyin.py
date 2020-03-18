@@ -46,7 +46,7 @@ _retroflex = ['rr']
 _tones = ['1', '2', '3', '4', '5']
 
 # Prosodic structure symbols (韵律结构标记)
-_prosodic_struct = [' ', '/', ',', '.']
+_prosodic_struct = [' ', '/', ',', '.', '?', '!']
 
 
 def split_pinyin(pinyin):
@@ -175,6 +175,8 @@ def pinyin_to_symbols(text):
   text = text.replace('/', ' / ')
   text = text.replace(',', ' , ')
   text = text.replace('.', ' . ')
+  text = text.replace('?', ' ? ')
+  text = text.replace('!', ' ! ')
   text = text.replace('-', ' ')
 
   # split into tokens
@@ -185,7 +187,7 @@ def pinyin_to_symbols(text):
   for token in tokens:
     if token == '|':
       symbols.append(' ')
-    elif token in ['/', ',', '.']:
+    elif token in ['/', ',', '.', '?', '!']:
       symbols.append(token)
     else:
       (initial, final, retroflex, tone) = split_pinyin(token)
