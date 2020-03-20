@@ -149,7 +149,7 @@ class Feeder:
 		examples = [self._get_test_groups() for i in range(len(self._test_meta))]
 
 		# Bucket examples based on similar output sequence length for efficiency
-		examples.sort(key=lambda x: x[-1])
+		examples.sort(key=lambda x: x[4])
 		batches = [examples[i: i+n] for i in range(0, len(examples), n)]
 		np.random.shuffle(batches)
 
@@ -166,7 +166,7 @@ class Feeder:
 			examples = [self._get_next_example() for i in range(n * _batches_per_group)]
 
 			# Bucket examples based on similar output sequence length for efficiency
-			examples.sort(key=lambda x: x[-1])
+			examples.sort(key=lambda x: x[4])
 			batches = [examples[i: i+n] for i in range(0, len(examples), n)]
 			np.random.shuffle(batches)
 
