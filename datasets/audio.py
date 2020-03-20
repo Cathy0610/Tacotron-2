@@ -115,13 +115,13 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 # tensorflow Griffin-Lim
 # Thanks to @begeekmyfriend: https://github.com/begeekmyfriend/Tacotron-2/blob/mandarin-new/datasets/audio.py
 
-def inv_linear_spectrogram_tensorflow(spectrogram, hparams):
+def inv_linear_spectrogram_tensorflow(linear_spectrogram, hparams):
 	'''Builds computational graph to convert spectrogram to waveform using TensorFlow.
 	Unlike inv_spectrogram, this does NOT invert the preemphasis. The caller should call
 	inv_preemphasis on the output after running the graph.
 	'''
 	if hparams.signal_normalization:
-		D = _denormalize_tensorflow(spectrogram, hparams)
+		D = _denormalize_tensorflow(linear_spectrogram, hparams)
 	else:
 		D = linear_spectrogram
 
