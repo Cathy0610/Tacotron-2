@@ -9,8 +9,11 @@ from hparams import hparams, hparams_debug_string
 from infolog import log
 from tacotron.synthesizer import Synthesizer
 from tqdm import tqdm
+import json
 
 import numpy as np
+import test_style_alignments
+
 
 def generate_fast(model, text):
 	model.synthesize([text], None, None, None, None)
@@ -41,6 +44,21 @@ def run_live(args, checkpoint_path, hparams):
 			break
 
 def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
+	if hparams.tacotron_style_transfer:
+		_sentences = []
+		for s in sentences:
+			_sentences += [s] * len(test_style_alignments.test_alignments)
+		test_alignments = test_style_alignments.test_alignments * len(sentences)
+		sentences = _sentences
+		# shape of <test_alignment>: [None, #heads, #token]
+		for _alignment in test_alignments:
+			assert hparams.tacotron_style_attention_num_heads == len(_alignment)
+			for _head in _alignment:
+				assert hparams.tacotron_n_style_token == len(_head)
+	else:
+		test_alignments = None
+		
+
 	eval_dir = os.path.join(output_dir, 'eval')
 	log_dir = os.path.join(output_dir, 'logs-eval')
 
@@ -59,19 +77,30 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 
 	#Set inputs batch wise
 	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
+	test_alignments = [test_alignments[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(test_alignments), hparams.tacotron_synthesis_batch_size)] if test_alignments is not None else test_alignments
 
 	log('Starting Synthesis')
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
 		for i, texts in enumerate(tqdm(sentences)):
 			start = time.time()
-			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
-			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
+
+			if test_alignments is None:
+				basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
+			else:
+				basenames = []
+				for j, text in enumerate(texts):
+					idx = i * hparams.tacotron_synthesis_batch_size + j
+					s_id = int(idx / len(test_style_alignments.test_alignments))
+					w_id = int(idx % len(test_style_alignments.test_alignments))
+					basenames.append('weight_{}_sentence_{}'.format(w_id, s_id))
+			
+			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None, test_alignments=test_alignments[i])
 			for mel_filename in mel_filenames:
 				npy_data = np.load(mel_filename)
 				npy_data = npy_data.reshape((-1,))
 				npy_data.tofile("%s.f32" % mel_filename)
 
-			for elems in zip(texts, mel_filenames, speaker_ids):
+			for elems in zip(texts, mel_filenames, test_alignments[i], speaker_ids):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
 	log('synthesized mel spectrograms at {}'.format(eval_dir))
 	return eval_dir

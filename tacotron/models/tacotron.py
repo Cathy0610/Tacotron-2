@@ -26,7 +26,7 @@ class Tacotron():
 		self._hparams = hparams
 
 	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
-			global_step=None, is_training=False, is_evaluating=False, split_infos=None, input_emo_labels=None):
+			global_step=None, is_training=False, is_evaluating=False, split_infos=None, input_emo_labels=None, input_style_alignments=None):
 		"""
 		Initializes the model for inference
 		sets "mel_outputs" and "alignments" fields.
@@ -52,11 +52,9 @@ class Tacotron():
 		if is_training and is_evaluating:
 			raise RuntimeError('Model can not be in training and evaluation modes at the same time!')
 		if self._hparams.tacotron_style_transfer and (not is_training) and (not is_evaluating):
-			assert (self._hparams.tacotron_style_reference_audio is not None or 
-				self._hparams.tacotron_style_encoder_output is not None or
-				(self._hparams.tacotron_style_mh_alignment is not None and
-				(len(self._hparams.tacotron_style_mh_alignment[0][0]) == self._hparams.tacotron_n_style_token) and
-				(len(self._hparams.tacotron_style_mh_alignment) == self._hparams.tacotron_style_attention_num_heads)))
+			assert (input_style_alignments is not None or
+				self._hparams.tacotron_style_reference_audio is not None or 
+				self._hparams.tacotron_style_encoder_output is not None)
 
 		split_device = '/cpu:0' if self._hparams.tacotron_num_gpus > 1 or self._hparams.split_on_cpu else '/gpu:0'
 		with tf.device(split_device):
@@ -67,6 +65,7 @@ class Tacotron():
 			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 			tower_targets_lengths = tf.split(targets_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if targets_lengths is not None else targets_lengths
 			tower_input_emo_labels = tf.split(input_emo_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if input_emo_labels is not None else input_emo_labels
+			tower_input_style_alignments = tf.split(input_style_alignments, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if input_style_alignments is not None else input_style_alignments
 
 			p_inputs = tf.py_func(split_func, [inputs, split_infos[:, 0]], lout_int)
 			p_mel_targets = tf.py_func(split_func, [mel_targets, split_infos[:,1]], lout_float) if mel_targets is not None else mel_targets
@@ -164,7 +163,21 @@ class Tacotron():
 						style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
 						encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
 					elif (not is_training) and (not is_evaluating) and self._hparams.tacotron_style_transfer:  # synthesis with style transfer
-						if len(tower_mel_targets) > 0 and tower_mel_targets[i] is not None:
+						if tower_input_style_alignments is not None:
+							# shape of tower_input_style_alignments[i]: [batch_size(size_per_device), #heads, #token]
+							# shape of input_alignment: [batch_size * #heads, 1, #token]
+							input_alignment = tf.concat(tf.split(tower_input_style_alignments[i], hp.tacotron_style_attention_num_heads, axis=1), axis=0)
+							style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
+												is_training=is_training)
+							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
+														multiples=[batch_size, 1, 1])
+							style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
+																		token_embedding=token_embedding,
+																		input_alignment=input_alignment)
+							seq_len = tf.shape(encoder_outputs)[1]
+							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
+							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
+						elif len(tower_mel_targets) > 0 and tower_mel_targets[i] is not None:
 							# reference audio
 							style_encoder_cell = TacotronReferenceEncoderCell(
 								ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size,
@@ -193,7 +206,10 @@ class Tacotron():
 							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[batch_size, seq_len, 1])
 							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
 						elif hp.tacotron_style_mh_alignment is not None:
+							# shape of <hp.tacotron_style_mh_alignment>: [#token, ]
 							input_alignment = tf.convert_to_tensor(hp.tacotron_style_mh_alignment, dtype=tf.float32)
+							input_alignment = tf.tile(tf.expand_dims(tf.expand_dims(input_alignment, axis=0), axis=0),
+														multiples=[hp.tacotron_style_attention_num_heads*batch_size, 1, 1])
 							style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
 												is_training=is_training)
 							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
@@ -328,10 +344,11 @@ class Tacotron():
 					alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
 
 					if self._hparams.tacotron_style_transfer:
-						if (not is_training) and (not is_evaluating):
-							if self._hparams.tacotron_style_encoder_output is None:
-								self.tower_style_alignments.append(style_alignment)
-							self.tower_style_encoder_outputs.append(style_encoder_outputs)
+						if self._hparams.tacotron_style_reference_audio is not None:
+							if (not is_training) and (not is_evaluating):
+								if self._hparams.tacotron_style_encoder_output is None:
+									self.tower_style_alignments.append(style_alignment)
+								self.tower_style_encoder_outputs.append(style_encoder_outputs)
 						self.tower_style_logits.append(tf.squeeze(style_logits, [1]))
 					
 					self.tower_decoder_output.append(decoder_output)
