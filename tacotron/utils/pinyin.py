@@ -144,7 +144,7 @@ def split_pinyin(pinyin):
     final = 'ei'
 
   # keep the original input, if it is not Pinyin
-  if initial not in symbols or final not in symbols:
+  if (len(initial) and initial not in symbols) or (len(final) and final not in symbols):
     final = input
     initial = ''
     retroflex = ''
