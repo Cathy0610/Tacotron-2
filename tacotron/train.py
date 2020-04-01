@@ -14,7 +14,7 @@ from tacotron.feeder import Feeder
 from tacotron.models import create_model
 from tacotron.utils import ValueWindow, plot
 from tacotron.utils.text import sequence_to_text
-from tacotron.utils.symbols import symbols
+from tacotron.utils.symbols import getSymbolSet
 from tqdm import tqdm
 
 log = infolog.log
@@ -161,7 +161,7 @@ def train(log_dir, args, hparams):
 	char_embedding_meta = os.path.join(meta_folder, 'CharacterEmbeddings.tsv')
 	if not os.path.isfile(char_embedding_meta):
 		with open(char_embedding_meta, 'w', encoding='utf-8') as f:
-			for symbol in symbols:
+			for symbol in getSymbolSet(lang=hparams.tacotron_lang):
 				if symbol == ' ':
 					symbol = '\\s' #For visual purposes, swap space with \s
 
