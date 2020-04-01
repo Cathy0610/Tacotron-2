@@ -1,25 +1,18 @@
 import re
 
 # from . import cleaners
-from .symbols import symbols, phonesplit, en_symbols, cmu_symbols
+from .symbols import getSymbolSet, phonesplit
 
 # Mappings from symbol to numeric ID and vice versa:
-_symbol_to_id = {s: i for i, s in enumerate(symbols)}
-_id_to_symbol = {i: s for i, s in enumerate(symbols)}
-_cur_lang = 'zh'
+_cur_lang = None
+_symbol_to_id = None
+_id_to_symbol = None
 
 def _change_lang(lang):
   global _cur_lang, _symbol_to_id, _id_to_symbol
   if _cur_lang != lang:
-    if lang == 'zh':
-      _symbol_to_id = {s: i for i, s in enumerate(symbols)}
-      _id_to_symbol = {i: s for i, s in enumerate(symbols)}
-    elif lang == 'en':
-      _symbol_to_id = {s: i for i, s in enumerate(en_symbols)}
-      _id_to_symbol = {i: s for i, s in enumerate(en_symbols)}
-    elif lang == 'cmu':
-      _symbol_to_id = {s: i for i, s in enumerate(cmu_symbols)}
-      _id_to_symbol = {i: s for i, s in enumerate(cmu_symbols)}
+    _symbol_to_id = {s: i for i, s in enumerate(getSymbolSet(lang))}
+    _id_to_symbol = {i: s for i, s in enumerate(getSymbolSet(lang))}
     _cur_lang = lang
 
 

@@ -1,5 +1,6 @@
 import argparse
 import os
+os.environ['CUDA_VISIBLE_DEVICES']='3,4'
 from warnings import warn
 from time import sleep
 
@@ -9,6 +10,7 @@ from hparams import hparams
 from infolog import log
 from tacotron.synthesize import tacotron_synthesize
 from tacotron.utils.symbols import phonesplit, _sep
+from tacotron.utils.pinyin import split_pinyin
 # from wavenet_vocoder.synthesize import wavenet_synthesize
 
 
@@ -23,7 +25,7 @@ def prepare_run(args):
 	wave_checkpoint = os.path.join('logs-' + run_name, 'wave_' + args.checkpoint)
 	return taco_checkpoint, wave_checkpoint, modified_hp
 
-def parse_sentence(sentence):
+def parse_sentence_zh(sentence):
 	phonemes = sentence.split()
 	symbols = []
 	for p in phonemes:
@@ -35,10 +37,25 @@ def parse_sentence(sentence):
 	symbols = symbols[1:]
 	return ' '.join(symbols)
 
-def get_sentences(args):
+def parse_sentence_py(sentence):
+	phonemes = sentence.split()
+	symbols = []
+	for p in phonemes:
+		if len(p) > 1:
+			symbols += list(split_pinyin(p))
+		else:
+			symbols.append(p)
+	return ' '.join([s for s in symbols if len(s)])
+
+def get_sentences(args, lang):
 	if args.text_list != '':
 		with open(args.text_list, 'r') as f:
-			sentences = list(map(parse_sentence, f.readlines()))
+			if lang == 'zh':
+				sentences = list(map(parse_sentence_zh, f.readlines()))
+			elif lang == 'py':
+				sentences = list(map(parse_sentence_py, f.readlines()))
+			else:
+				sentences = [line.strip() for line in f.readlines()]
 	else:
 		sentences = hparams.sentences
 	return sentences
@@ -97,7 +114,7 @@ def main():
 			raise ValueError('I don\'t recommend running WaveNet on entire dataset.. The world might end before the synthesis :) (only eval allowed)')
 
 	taco_checkpoint, wave_checkpoint, hparams = prepare_run(args)
-	sentences = get_sentences(args)
+	sentences = get_sentences(args, lang=hparams.tacotron_lang)
 
 	if args.model == 'Tacotron':
 		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)

@@ -1,5 +1,5 @@
 import tensorflow as tf 
-from tacotron.utils.symbols import symbols
+from tacotron.utils.symbols import getSymbolSet
 from infolog import log
 from tacotron.models.helpers import TacoTrainingHelper, TacoTestHelper
 from tacotron.models.modules import *
@@ -120,7 +120,7 @@ class Tacotron():
 
 					# Embeddings ==> [batch_size, sequence_length, embedding_dim]
 					self.embedding_table = tf.get_variable(
-						'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32)
+						'inputs_embedding', [len(getSymbolSet(hp.tacotron_lang)), hp.embedding_dim], dtype=tf.float32)
 					embedded_inputs = tf.nn.embedding_lookup(self.embedding_table, tower_inputs[i])
 
 

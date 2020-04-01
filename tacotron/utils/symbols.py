@@ -111,6 +111,46 @@ def phonesplit(pinyin):
 # symbols = [_pad, _eos] + list(_characters) #+ _arpabet
 symbols = [_pad, _eos, _sep] + _initials + _finals + _prosodic_struct + cmudict.valid_symbols
 
+# Adapted Pinyin symbol set from tacotron.utils.pinyin
+# Mandarin initials (普通话声母列表)
+_py_initials = ['b', 'p', 'f', 'm', \
+             'd', 't', 'n', 'l', \
+             'g', 'k', 'h', \
+             'j', 'q', 'x', \
+             'zh', 'ch', 'sh', 'r', \
+             'z', 'c', 's']
+# Mandarin finals (普通话韵母列表)
+_py_finals = ['a',  'ai', 'ao',  'an',  'ang', \
+           'o',  'ou', 'ong', \
+           'e',  'ei', 'en',  'eng', 'er', 'ev', \
+           'i',  'ix', 'iy', \
+           'ia', 'iao','ian', 'iang','ie', \
+           'in', 'ing','io',  'iou', 'iong', \
+           'u',  'ua', 'uo',  'uai', 'uei', \
+           'uan','uen','uang','ueng', \
+           'v',  've', 'van', 'vn', \
+           'ng', 'mm', 'nn']
+# Retroflex (Erhua) (儿化音信息)
+_py_retroflex = ['rr']
+# Tones (声调信息)
+_py_tones = ['1', '2', '3', '4', '5', '6']
+# Prosodic structure symbols (韵律结构标记)
+_py_prosodic_struct = ['-', '`', '/', ',', '.']
+
+py_symbols = [_pad, _eos] + _py_initials + _py_finals + _py_retroflex + _py_tones + _py_prosodic_struct
+
 en_symbols = [_pad, _eos, _sep] + list(_characters)
 
 cmu_symbols = [_pad, _eos, _sep, _slash] + cmudict.valid_symbols
+
+def getSymbolSet(lang):
+    if lang == 'zh':
+        return symbols
+    elif lang == 'py':
+        return py_symbols
+    elif lang == 'cmu':
+        return cmu_symbols
+    elif lang == 'en':
+        return en_symbols
+    else:
+        raise NameError('Unknown target language: %s' % str(lang))
