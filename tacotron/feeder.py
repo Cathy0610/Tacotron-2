@@ -26,8 +26,10 @@ class Feeder:
 		self._test_offset = 0
 
 		# Load metadata
-		# self._mel_dir = os.path.join(os.path.dirname(metadata_filename), 'mels')
-		self._mel_dir = os.path.join(os.path.dirname(metadata_filename), 'feat')
+		if hparams.lpc_util:
+			self._mel_dir = os.path.join(os.path.dirname(metadata_filename), hparams.lpc_taco_train_target_dir)
+		else:
+			self._mel_dir = os.path.join(os.path.dirname(metadata_filename), 'mels')
 		self._linear_dir = os.path.join(os.path.dirname(metadata_filename), 'linear')
 		with open(metadata_filename, encoding='utf-8') as f:
 			self._metadata = [line.strip().split('|') for line in f]
@@ -131,8 +133,7 @@ class Feeder:
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.tacotron_lang), dtype=np.int32)
 		input_emo_label = emo_to_id(meta[5])
-		mel_target = np.fromfile(os.path.join(self._mel_dir, meta[1][4:-4]+'.f32'), dtype='float32')
-		mel_target = np.resize(mel_target, (-1, self._hparams.num_mels))
+		mel_target = np.load(os.path.join(self._mel_dir, meta[1][4:]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None
@@ -197,8 +198,7 @@ class Feeder:
 
 		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.tacotron_lang), dtype=np.int32)
 		input_emo_label = emo_to_id(meta[5])
-		mel_target = np.fromfile(os.path.join(self._mel_dir, meta[1][4:-4]+'.f32'), dtype='float32')
-		mel_target = np.resize(mel_target, (-1, self._hparams.num_mels))
+		mel_target = np.load(os.path.join(self._mel_dir, meta[1][4:]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2])) if self._hparams.predict_linear else None

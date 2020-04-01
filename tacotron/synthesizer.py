@@ -50,7 +50,7 @@ class Synthesizer:
 				self.style_alignments = self.model.tower_style_alignments
 				self.style_encoder_outputs = self.model.tower_style_encoder_outputs
 
-		if hparams.GL_on_GPU:
+		if not hparams.lpc_util and hparams.GL_on_GPU:
 			self.GLGPU_mel_inputs = tf.placeholder(tf.float32, (None, hparams.num_mels), name='GLGPU_mel_inputs')
 			self.GLGPU_lin_inputs = tf.placeholder(tf.float32, (None, hparams.num_freq), name='GLGPU_lin_inputs')
 
@@ -217,7 +217,8 @@ class Synthesizer:
 			linears = [np.clip(linear, T2_output_range[0], T2_output_range[1]) for linear in linears]
 			assert len(mels) == len(linears) == len(texts)
 
-		mels = [np.clip(mel, T2_output_range[0], T2_output_range[1]) for mel in mels]
+		if not hparams.lpc_util or hparams.lpc_scaler_path is not None:
+			mels = [np.clip(mel, T2_output_range[0], T2_output_range[1]) for mel in mels]
 
 		if basenames is None:
 			#Generate wav and read it
@@ -267,19 +268,22 @@ class Synthesizer:
 
 			if log_dir is not None:
 				#save wav (mel -> wav)
-				if hparams.GL_on_GPU:
-					wav = self.session.run(self.GLGPU_mel_outputs, feed_dict={self.GLGPU_mel_inputs: mel})
-					wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+				if hparams.lpc_util:
+					audio.inv_lpc_feature(mel, os.path.join(log_dir, 'wavs/wav-{}-mel.wav'.format(basenames[i])), hparams)
 				else:
-					wav = audio.inv_mel_spectrogram(mel.T, hparams)
-				audio.save_wav(wav, os.path.join(log_dir, 'wavs/wav-{}-mel.wav'.format(basenames[i])), sr=hparams.sample_rate)
+					if hparams.GL_on_GPU:
+						wav = self.session.run(self.GLGPU_mel_outputs, feed_dict={self.GLGPU_mel_inputs: mel})
+						wav = audio.inv_preemphasis(wav, hparams.preemphasis, hparams.preemphasize)
+					else:
+						wav = audio.inv_mel_spectrogram(mel.T, hparams)
+					audio.save_wav(wav, os.path.join(log_dir, 'wavs/wav-{}-mel.wav'.format(basenames[i])), sr=hparams.sample_rate)
 
 				#save alignments
 				plot.plot_alignment(alignments[i], os.path.join(log_dir, 'plots/alignment-{}.png'.format(basenames[i])),
 					title='{}'.format(texts[i]), split_title=True, max_len=target_lengths[i])
 
 				#save mel spectrogram plot
-				plot.plot_spectrogram(mel, os.path.join(log_dir, 'plots/mel-{}.png'.format(basenames[i])),
+				plot.plot_spectrogram(mel[:, :18] if hparams.lpc_util else mel, os.path.join(log_dir, 'plots/mel-{}.png'.format(basenames[i])),
 					title='{}'.format(texts[i]), split_title=True)
 
 				

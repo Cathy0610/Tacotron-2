@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 from scipy import signal
 from scipy.io import wavfile
+import joblib
+import os
 
 
 def load_wav(path, sr):
@@ -111,6 +113,25 @@ def inv_mel_spectrogram(mel_spectrogram, hparams):
 	else:
 		return inv_preemphasis(_griffin_lim(S ** hparams.power, hparams), hparams.preemphasis, hparams.preemphasize)
 
+def inv_lpc_feature(lpc_feature, savepath, hparams):
+	'''Converts 20-dim lpc features to waveform using LPCNet'''
+	if hparams.lpc_scaler_path is not None:
+		lpc_scaler = joblib.load(hparams.lpc_scaler_path)
+		lpc_feature = lpc_scaler.inverse_transform(lpc_feature)
+	lpc_feature = lpc_feature.reshape((-1,))
+
+	dirname, filename = os.path.split(savepath)
+	basename = os.path.join(dirname, os.path.splitext(filename)[0])
+	lpc_feature.tofile("%s_tmp.f32" % basename)
+
+	lpc_inv_cmd = "%s %s_tmp.f32 %s_tmp.s16" % (hparams.lpc_exec_path, basename, basename)
+	os.system(lpc_inv_cmd)
+	ffmpeg_cmd = "ffmpeg -loglevel error -f s16le -ar 16k -ac 1 -i %s_tmp.s16 %s" % (basename, savepath)
+	os.system(ffmpeg_cmd)
+	os.remove("%s_tmp.f32" % basename)
+	os.remove("%s_tmp.s16" % basename)
+
+		
 ###########################################################################################
 # tensorflow Griffin-Lim
 # Thanks to @begeekmyfriend: https://github.com/begeekmyfriend/Tacotron-2/blob/mandarin-new/datasets/audio.py
