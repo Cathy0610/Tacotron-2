@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 
 def generate_fast(model, text):
-	model.synthesize(text, None, None, None, None)
+	model.synthesize(text, None, None, None, None, None, None)
 
 
 def run_live(args, checkpoint_path, hparams):
@@ -39,7 +39,7 @@ def run_live(args, checkpoint_path, hparams):
 			sleep(2)
 			break
 
-def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
+def run_eval(args, checkpoint_path, output_dir, hparams, sentences, speakers, languages):
 	eval_dir = os.path.join(output_dir, 'eval')
 	log_dir = os.path.join(output_dir, 'logs-eval')
 
@@ -58,13 +58,14 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 
 	#Set inputs batch wise
 	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
-
+	speakers  = [ speakers[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(speakers),  hparams.tacotron_synthesis_batch_size)]
+	languages = [languages[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(languages), hparams.tacotron_synthesis_batch_size)]
 	log('Starting Synthesis')
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
 		for i, texts in enumerate(tqdm(sentences)):
 			start = time.time()
 			basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
-			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None)
+			mel_filenames, speaker_ids = synth.synthesize(texts, speakers[i], languages[i], basenames, eval_dir, log_dir, None)
 
 			for elems in zip(texts, mel_filenames, speaker_ids):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
@@ -104,17 +105,19 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
 		for i, meta in enumerate(tqdm(metadata)):
 			texts = [m[5] for m in meta]
+			speakers = [m[6] for m in meta]
+			languages = [m[7] for m in meta]
 			mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
 			wav_filenames = [os.path.join(wav_dir, m[0]) for m in meta]
 			basenames = [os.path.basename(m).replace('.npy', '').replace('mel-', '') for m in mel_filenames]
-			mel_output_filenames, speaker_ids = synth.synthesize(texts, basenames, synth_dir, None, mel_filenames)
+			mel_output_filenames, speaker_ids = synth.synthesize(texts, speakers, languages, basenames, synth_dir, None, mel_filenames)
 
 			for elems in zip(wav_filenames, mel_filenames, mel_output_filenames, speaker_ids, texts):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
 	log('synthesized mel spectrograms at {}'.format(synth_dir))
 	return os.path.join(synth_dir, 'map.txt')
 
-def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
+def tacotron_synthesize(args, hparams, checkpoint, sentences=None, speakers=None, languages=None):
 	output_dir = 'tacotron_' + args.output_dir
 
 	try:
@@ -132,7 +135,7 @@ def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 			hparams.tacotron_synthesis_batch_size, hparams.tacotron_num_gpus))
 
 	if args.mode == 'eval':
-		return run_eval(args, checkpoint_path, output_dir, hparams, sentences)
+		return run_eval(args, checkpoint_path, output_dir, hparams, sentences, speakers, languages)
 	elif args.mode == 'synthesis':
 		return run_synthesis(args, checkpoint_path, output_dir, hparams)
 	else:

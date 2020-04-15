@@ -74,6 +74,7 @@ class Feeder:
 			self._placeholders = [
 			tf.placeholder(tf.int32, shape=(None, None), name='inputs'),
 			tf.placeholder(tf.int32, shape=(None, ), name='input_lengths'),
+			tf.placeholder(tf.int32, shape=(None, ), name='speaker_labels'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='mel_targets'),
 			tf.placeholder(tf.float32, shape=(None, None), name='token_targets'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_freq), name='linear_targets'),
@@ -82,31 +83,33 @@ class Feeder:
 			]
 
 			# Create queue for buffering data
-			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='input_queue')
+			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='input_queue')
 			self._enqueue_op = queue.enqueue(self._placeholders)
-			self.inputs, self.input_lengths, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos = queue.dequeue()
+			self.inputs, self.input_lengths, self.speaker_labels, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos = queue.dequeue()
 
 			self.inputs.set_shape(self._placeholders[0].shape)
 			self.input_lengths.set_shape(self._placeholders[1].shape)
-			self.mel_targets.set_shape(self._placeholders[2].shape)
-			self.token_targets.set_shape(self._placeholders[3].shape)
-			self.linear_targets.set_shape(self._placeholders[4].shape)
-			self.targets_lengths.set_shape(self._placeholders[5].shape)
-			self.split_infos.set_shape(self._placeholders[6].shape)
+			self.speaker_labels.set_shape(self._placeholders[2].shape)
+			self.mel_targets.set_shape(self._placeholders[3].shape)
+			self.token_targets.set_shape(self._placeholders[4].shape)
+			self.linear_targets.set_shape(self._placeholders[5].shape)
+			self.targets_lengths.set_shape(self._placeholders[6].shape)
+			self.split_infos.set_shape(self._placeholders[7].shape)
 
 			# Create eval queue for buffering eval data
-			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='eval_queue')
+			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='eval_queue')
 			self._eval_enqueue_op = eval_queue.enqueue(self._placeholders)
-			self.eval_inputs, self.eval_input_lengths, self.eval_mel_targets, self.eval_token_targets, \
+			self.eval_inputs, self.eval_input_lengths, self.eval_speaker_labels, self.eval_mel_targets, self.eval_token_targets, \
 				self.eval_linear_targets, self.eval_targets_lengths, self.eval_split_infos = eval_queue.dequeue()
 
 			self.eval_inputs.set_shape(self._placeholders[0].shape)
 			self.eval_input_lengths.set_shape(self._placeholders[1].shape)
-			self.eval_mel_targets.set_shape(self._placeholders[2].shape)
-			self.eval_token_targets.set_shape(self._placeholders[3].shape)
-			self.eval_linear_targets.set_shape(self._placeholders[4].shape)
-			self.eval_targets_lengths.set_shape(self._placeholders[5].shape)
-			self.eval_split_infos.set_shape(self._placeholders[6].shape)
+			self.eval_speaker_labels.set_shape(self._placeholders[2].shape)
+			self.eval_mel_targets.set_shape(self._placeholders[3].shape)
+			self.eval_token_targets.set_shape(self._placeholders[4].shape)
+			self.eval_linear_targets.set_shape(self._placeholders[5].shape)
+			self.eval_targets_lengths.set_shape(self._placeholders[6].shape)
+			self.eval_split_infos.set_shape(self._placeholders[7].shape)
 
 	def start_threads(self, session):
 		self._session = session
@@ -129,7 +132,10 @@ class Feeder:
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2]))
-		return (input_data, mel_target, token_target, linear_target, len(mel_target))
+
+		speaker_label = int(meta[6])
+		language_label = int(meta[7])
+		return (input_data, speaker_label, language_label, mel_target, token_target, linear_target, len(mel_target))
 
 	def make_test_batches(self):
 		start = time.time()
@@ -193,7 +199,10 @@ class Feeder:
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
 		linear_target = np.load(os.path.join(self._linear_dir, meta[2]))
-		return (input_data, mel_target, token_target, linear_target, len(mel_target))
+
+		speaker_label = int(meta[6])
+		language_label = int(meta[7])
+		return (input_data, speaker_label, language_label, mel_target, token_target, linear_target, len(mel_target))
 
 	def _prepare_batch(self, batches, outputs_per_step):
 		assert 0 == len(batches) % self._hparams.tacotron_num_gpus
@@ -201,6 +210,8 @@ class Feeder:
 		np.random.shuffle(batches)
 
 		inputs = None
+		speaker_labels = None
+		language_labels = None
 		mel_targets = None
 		token_targets = None
 		linear_targets = None
@@ -209,23 +220,25 @@ class Feeder:
 
 		targets_lengths = np.asarray([x[-1] for x in batches], dtype=np.int32) #Used to mask loss
 		input_lengths = np.asarray([len(x[0]) for x in batches], dtype=np.int32)
+		speaker_labels = np.asarray([x[1] for x in batches], dtype=np.int32)
+		language_labels = np.asarray([x[2] for x in batches], dtype=np.int32)
 
 		for i in range(self._hparams.tacotron_num_gpus):
 			batch = batches[size_per_device*i:size_per_device*(i+1)]
 			input_cur_device, input_max_len = self._prepare_inputs([x[0] for x in batch])
 			inputs = np.concatenate((inputs, input_cur_device), axis=1) if inputs is not None else input_cur_device
-			mel_target_cur_device, mel_target_max_len = self._prepare_targets([x[1] for x in batch], outputs_per_step)
+			mel_target_cur_device, mel_target_max_len = self._prepare_targets([x[3] for x in batch], outputs_per_step)
 			mel_targets = np.concatenate(( mel_targets, mel_target_cur_device), axis=1) if mel_targets is not None else mel_target_cur_device
 
 			#Pad sequences with 1 to infer that the sequence is done
-			token_target_cur_device, token_target_max_len = self._prepare_token_targets([x[2] for x in batch], outputs_per_step)
-			token_targets = np.concatenate((token_targets, token_target_cur_device),axis=1) if token_targets is not None else token_target_cur_device
-			linear_targets_cur_device, linear_target_max_len = self._prepare_targets([x[3] for x in batch], outputs_per_step)
+			token_target_cur_device, token_target_max_len = self._prepare_token_targets([x[4] for x in batch], outputs_per_step)
+			token_targets = np.concatenate((token_targets, token_target_cur_device), axis=1) if token_targets is not None else token_target_cur_device
+			linear_targets_cur_device, linear_target_max_len = self._prepare_targets([x[5] for x in batch], outputs_per_step)
 			linear_targets = np.concatenate((linear_targets, linear_targets_cur_device), axis=1) if linear_targets is not None else linear_targets_cur_device
 			split_infos.append([input_max_len, mel_target_max_len, token_target_max_len, linear_target_max_len])
 
 		split_infos = np.asarray(split_infos, dtype=np.int32)
-		return (inputs, input_lengths, mel_targets, token_targets, linear_targets, targets_lengths, split_infos)
+		return (inputs, input_lengths, speaker_labels, mel_targets, token_targets, linear_targets, targets_lengths, split_infos)
 
 	def _prepare_inputs(self, inputs):
 		max_len = max([len(x) for x in inputs])

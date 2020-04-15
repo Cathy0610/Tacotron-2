@@ -124,6 +124,16 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
 
+	#Speaker classifier
+	speaker_grad_rev_scale = 1, #scale for gradient reversal layer, 梯度反转系数
+	speaker_grad_clip_factor = 0.5, #gradient clipping factor, 梯度裁剪因子
+	speaker_hidden_layer = 256, #softmax for speaker classfier
+	speaker_loss_weight = 0.02, #weight of speaker classifier
+	
+	#Speaker embedding
+	speaker_embedding_dim = 64, #dimension of speaker embedding
+	speaker_num = 10, #number of speakers
+
 	#Attention mechanism
 	smoothing = False, #Whether to smooth the attention normalization function
 	attention_dim = 128, #dimension of attention space

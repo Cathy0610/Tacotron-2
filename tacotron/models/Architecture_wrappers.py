@@ -84,7 +84,7 @@ class TacotronDecoderCell(RNNCell):
 	tensorflow's attention wrapper call if it was using cumulative alignments instead of previous alignments only.
 	"""
 
-	def __init__(self, prenet, attention_mechanism, rnn_cell, frame_projection, stop_projection):
+	def __init__(self, prenet, attention_mechanism, rnn_cell, speaker_embedding, frame_projection, stop_projection):
 		"""Initialize decoder parameters
 
 		Args:
@@ -92,6 +92,7 @@ class TacotronDecoderCell(RNNCell):
 		    attention_mechanism: A _BaseAttentionMechanism instance, usefull to
 			    learn encoder-decoder alignments
 		    rnn_cell: Instance of RNNCell, main body of the decoder
+		    speaker_embedding: Speaker Embedding to build the speaker dependent decoder
 		    frame_projection: tensorflow fully connected layer with r * num_mels output units
 		    stop_projection: tensorflow fully connected layer, expected to project to a scalar
 			    and through a sigmoid activation
@@ -102,6 +103,7 @@ class TacotronDecoderCell(RNNCell):
 		self._prenet = prenet
 		self._attention_mechanism = attention_mechanism
 		self._cell = rnn_cell
+		self._speaker_embedding = speaker_embedding
 		self._frame_projection = frame_projection
 		self._stop_projection = stop_projection
 
@@ -169,7 +171,7 @@ class TacotronDecoderCell(RNNCell):
 		prenet_output = self._prenet(inputs)
 
 		#Concat context vector and prenet output to form LSTM cells input (input feeding)
-		LSTM_input = tf.concat([prenet_output, state.attention], axis=-1)
+		LSTM_input = tf.concat([prenet_output, state.attention, self._speaker_embedding], axis=-1)
 
 		#Unidirectional LSTM layers
 		LSTM_output, next_cell_state = self._cell(LSTM_input, state.cell_state)

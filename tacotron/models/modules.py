@@ -373,6 +373,72 @@ class Postnet:
 		return x
 
 
+class GradientReversal:
+	"""Gradient Reversal layer
+	"""
+	#
+	# 其实使用tf.stop_gradient()函数可以更方便实现梯度反转
+	# 方法为:
+	#  f = self.encoder(x); t = -hp.grad_rev_scale * f; rev_f = t + tf.stop_gradient(f - t)
+	# 其含义为: 
+	#  f是计算的特征;
+	#  t是负的梯度反转系数乘以f;
+	#  tf.stop_gradient()函数在前向传播时不做任何改变, 反向传播时则改项梯度为0,
+	#  所以rev_f在前向传播时的值是t+f-t, 反向传播是对t的梯度+0
+	#
+	cnt = 0
+	def __init__(self, name="GradRevIdentity"):
+		self.call_num = 0                # 用于防止多次调用call函数时名字被重复使用
+		self.cnt = GradientReversal.cnt  # 用于防止类被多次实例化
+		GradientReversal.cnt += 1
+		self.name = name
+
+	def call(self, x, s=1.0, f=0.5):
+		op_name = self.name + "_" + str(self.cnt) + "_" + str(self.call_num)
+		self.call_num += 1
+
+		@tf.RegisterGradient(op_name)
+		def reverse_grad(op, grad):      # op是被override的操作的输入, grad是当前真实梯度值
+			rgrad = tf.clip_by_norm(-grad*s, f)
+			return rgrad
+		g = tf.get_default_graph()
+		with g.gradient_override_map({"Identity": op_name}): # 将下面的identity的梯度改成0
+			y = tf.identity(x)
+		return y
+
+	def __call__(self, x, s=1.0, f=0.5):
+		"""
+		Args:
+			s: gradient reversal scale
+			f: gradient clipping factor
+		"""	
+		return self.call(x, s, f)
+
+
+class AdversarialClassifier:
+	"""
+	Adversarial classifier for #classes = class_num, with one Gradient Reversal layer and one hidden layer
+	"""
+	def __init__(self, is_training, hidden_size=256, class_num=10, scope=None):
+		super(AdversarialClassifier, self).__init__()
+		self.is_training = is_training
+
+		self.hidden_size = hidden_size
+		self.class_num = class_num
+		self.scope = 'AdversarialClassifier' if scope is None else scope
+		
+		self.gradient_rev = GradientReversal()
+		self.hidden = tf.layers.Dense(units=self.hidden_size, activation=tf.nn.relu, name='hidden_{}'.format(self.scope))
+		self.output = tf.layers.Dense(units=self.class_num, activation=tf.nn.relu, name='output_{}'.format(self.scope))
+
+	def __call__(self, inputs, grad_rev_scale, grad_clip_factor):
+		with tf.variable_scope(self.scope):
+			rev = self.gradient_rev(inputs, grad_rev_scale, grad_clip_factor)
+			hid = self.hidden(rev)
+			out = self.output(hid)
+			return out
+
+
 def conv1d(inputs, kernel_size, channels, activation, is_training, drop_rate, scope):
 	with tf.variable_scope(scope):
 		conv1d_output = tf.layers.conv1d(

@@ -25,7 +25,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
+	def initialize(self, inputs, speaker_labels, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
 			global_step=None, is_training=False, is_evaluating=False, split_infos=None):
 		"""
 		Initializes the model for inference
@@ -33,6 +33,8 @@ class Tacotron():
 		Args:
 			- inputs: int32 Tensor with shape [N, T_in] where N is batch size, T_in is number of
 			  steps in the input time series, and values are character IDs
+			- speaker_labels: int32 Tensor with shape [N] where N is batch size and values are the speaker ids
+			  of each sequence in inputs.
 			- input_lengths: int32 Tensor with shape [N] where N is batch size and values are the lengths
 			of each sequence in inputs.
 			- mel_targets: float32 Tensor with shape [N, T_out, M] where N is batch size, T_out is number
@@ -60,6 +62,7 @@ class Tacotron():
 
 			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 			tower_targets_lengths = tf.split(targets_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if targets_lengths is not None else targets_lengths
+			tower_speaker_labels = tf.split(speaker_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 
 			p_inputs = tf.py_func(split_func, [inputs, split_infos[:, 0]], lout_int)
 			p_mel_targets = tf.py_func(split_func, [mel_targets, split_infos[:,1]], lout_float) if mel_targets is not None else mel_targets
@@ -88,7 +91,10 @@ class Tacotron():
 		self.tower_stop_token_prediction = []
 		self.tower_mel_outputs = []
 		self.tower_linear_outputs = []
+		self.tower_speaker_targets = []
+		self.tower_speaker_prediction = []
 
+		tower_speaker_embeddings = []
 		tower_embedded_inputs = []
 		tower_enc_conv_output_shape = []
 		tower_encoder_outputs = []
@@ -112,6 +118,14 @@ class Tacotron():
 						'inputs_embedding', [len(symbols), hp.embedding_dim], dtype=tf.float32)
 					embedded_inputs = tf.nn.embedding_lookup(self.embedding_table, tower_inputs[i])
 
+					# Speaker Embeddings
+					self.speaker_embedding_table = tf.get_variable(
+						'speakers_embedding', [hp.speaker_num, hp.speaker_embedding_dim], dtype=tf.float32)
+					speaker_embeddings = tf.nn.embedding_lookup(self.speaker_embedding_table, tower_speaker_labels[i])
+
+					# One-hot representation of speaker labels (for Adversarial Loss)
+					speaker_targets = tf.one_hot(tower_speaker_labels[i], hp.speaker_num, dtype=tf.float32)
+
 
 					#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
 					encoder_cell = TacotronEncoderCell(
@@ -123,6 +137,16 @@ class Tacotron():
 
 					#For shape visualization purpose
 					enc_conv_output_shape = encoder_cell.conv_output_shape
+
+
+					#Adversarial Speaker-Classifiers,	input:encoder_output, output:predicted speaker_prediction
+					speaker_classifier = AdversarialClassifier(is_training, hidden_size=hp.speaker_hidden_layer, class_num=hp.speaker_num)
+
+					#encoder_outputs is with shape [N, T_in, encoder_lstm_units*2]
+					#speaker_prediction is predicted for each time step of input, resulting in [N, T_in, speaker_num]
+					#get speaker_prediction of the whole sentence by calculating mean along time axis, with shape [N, speaker_num]
+					speaker_prediction = speaker_classifier(encoder_outputs, hp.speaker_grad_rev_scale, hp.speaker_grad_clip_factor)
+					speaker_prediction = tf.reduce_mean(speaker_prediction, axis=1)
 
 
 					#Decoder Parts
@@ -146,6 +170,7 @@ class Tacotron():
 						prenet,
 						attention_mechanism,
 						decoder_lstm,
+						speaker_embeddings,
 						frame_projection,
 						stop_projection)
 
@@ -214,6 +239,9 @@ class Tacotron():
 					self.tower_alignments.append(alignments)
 					self.tower_stop_token_prediction.append(stop_token_prediction)
 					self.tower_mel_outputs.append(mel_outputs)
+					self.tower_speaker_targets.append(speaker_targets)
+					self.tower_speaker_prediction.append(speaker_prediction)
+					tower_speaker_embeddings.append(speaker_embeddings)
 					tower_embedded_inputs.append(embedded_inputs)
 					tower_enc_conv_output_shape.append(enc_conv_output_shape)
 					tower_encoder_outputs.append(encoder_outputs)
@@ -227,6 +255,7 @@ class Tacotron():
 
 		if is_training:
 			self.ratio = self.helper._ratio
+		self.tower_speaker_labels = tower_speaker_labels
 		self.tower_inputs = tower_inputs
 		self.tower_input_lengths = tower_input_lengths
 		self.tower_mel_targets = tower_mel_targets
@@ -244,7 +273,8 @@ class Tacotron():
 		log('  Input:                    {}'.format(inputs.shape))
 		for i in range(hp.tacotron_num_gpus+hp.tacotron_gpu_start_idx):
 			log('  device:                   {}'.format(i))
-			log('  embedding:                {}'.format(tower_embedded_inputs[i].shape))
+			log('  speaker embedding:        {}'.format(tower_speaker_embeddings[i].shape))
+			log('  text embedding:           {}'.format(tower_embedded_inputs[i].shape))
 			log('  enc conv out:             {}'.format(tower_enc_conv_output_shape[i]))
 			log('  encoder out:              {}'.format(tower_encoder_outputs[i].shape))
 			log('  decoder out:              {}'.format(self.tower_decoder_output[i].shape))
@@ -268,6 +298,7 @@ class Tacotron():
 		self.tower_stop_token_loss = []
 		self.tower_regularization_loss = []
 		self.tower_linear_loss = []
+		self.tower_adversarial_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -275,6 +306,7 @@ class Tacotron():
 		total_stop_token_loss = 0
 		total_regularization_loss = 0
 		total_linear_loss = 0
+		total_adversarial_loss = 0
 		total_loss = 0
 
 		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_gpu_start_idx, hp.tacotron_gpu_start_idx+hp.tacotron_num_gpus)]
@@ -331,7 +363,13 @@ class Tacotron():
 					# Note that we consider attention mechanism v_a weights as a prediction projection layer and we don't regularize it. (This gave better stability)
 					regularization = tf.add_n([tf.nn.l2_loss(v) for v in self.all_vars
 						if not('bias' in v.name or 'Bias' in v.name or '_projection' in v.name or 'inputs_embedding' in v.name
+							or 'speakers_embedding' in v.name
 							or 'RNN' in v.name or 'LSTM' in v.name)]) * reg_weight
+
+					#Compute the speaker adversarial training loss
+					adversarial_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
+						labels=self.tower_speaker_targets[i],
+						logits=self.tower_speaker_prediction[i]))
 
 					# Compute final loss term
 					self.tower_before_loss.append(before)
@@ -339,8 +377,9 @@ class Tacotron():
 					self.tower_stop_token_loss.append(stop_token_loss)
 					self.tower_regularization_loss.append(regularization)
 					self.tower_linear_loss.append(linear_loss)
+					self.tower_adversarial_loss.append(adversarial_loss)
 
-					loss = before + after + stop_token_loss + regularization + linear_loss
+					loss = before + after + stop_token_loss + regularization + linear_loss + hp.speaker_loss_weight * adversarial_loss
 					self.tower_loss.append(loss)
 
 		for i in range(hp.tacotron_num_gpus):
@@ -349,6 +388,7 @@ class Tacotron():
 			total_stop_token_loss += self.tower_stop_token_loss[i]
 			total_regularization_loss += self.tower_regularization_loss[i]
 			total_linear_loss += self.tower_linear_loss[i]
+			total_adversarial_loss += self.tower_adversarial_loss[i]
 			total_loss += self.tower_loss[i]
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
@@ -356,6 +396,7 @@ class Tacotron():
 		self.stop_token_loss = total_stop_token_loss / hp.tacotron_num_gpus
 		self.regularization_loss = total_regularization_loss / hp.tacotron_num_gpus
 		self.linear_loss = total_linear_loss / hp.tacotron_num_gpus
+		self.adversarial_loss = total_adversarial_loss / hp.tacotron_num_gpus
 		self.loss = total_loss / hp.tacotron_num_gpus
 
 	def add_optimizer(self, global_step):

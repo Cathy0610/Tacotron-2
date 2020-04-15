@@ -51,6 +51,7 @@ def add_train_stats(model, hparams):
 		
 		tf.summary.scalar('regularization_loss', model.regularization_loss)
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
+		tf.summary.scalar('adversarial_loss', model.adversarial_loss)
 		tf.summary.scalar('loss', model.loss)
 		tf.summary.scalar('learning_rate', model.learning_rate) #Control learning rate decay speed
 		if hparams.tacotron_teacher_forcing_mode == 'scheduled':
@@ -82,11 +83,11 @@ def model_train_mode(args, feeder, hparams, global_step):
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
-			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets,
+			model.initialize(feeder.inputs, feeder.speaker_labels, feeder.input_lengths, feeder.mel_targets, feeder.token_targets, linear_targets=feeder.linear_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
 				is_training=True, split_infos=feeder.split_infos)
 		else:
-			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets,
+			model.initialize(feeder.inputs, feeder.speaker_labels, feeder.input_lengths, feeder.mel_targets, feeder.token_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
 				is_training=True, split_infos=feeder.split_infos)
 		model.add_loss()
@@ -101,11 +102,11 @@ def model_test_mode(args, feeder, hparams, global_step):
 			model_name = 'Tacotron'
 		model = create_model(model_name or args.model, hparams)
 		if hparams.predict_linear:
-			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
+			model.initialize(feeder.eval_inputs, feeder.eval_speaker_labels, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				linear_targets=feeder.eval_linear_targets, targets_lengths=feeder.eval_targets_lengths, global_step=global_step,
 				is_training=False, is_evaluating=True, split_infos=feeder.eval_split_infos)
 		else:
-			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
+			model.initialize(feeder.eval_inputs, feeder.eval_speaker_labels, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				targets_lengths=feeder.eval_targets_lengths, global_step=global_step, is_training=False, is_evaluating=True, 
 				split_infos=feeder.eval_split_infos)
 		model.add_loss()
@@ -167,6 +168,15 @@ def train(log_dir, args, hparams):
 				f.write('{}\n'.format(symbol))
 
 	char_embedding_meta = char_embedding_meta.replace(log_dir, '..')
+
+	#Speaker Embeddings metadata
+	speaker_embedding_meta = os.path.join(meta_folder, 'SpeakerEmbeddings.tsv')
+	if not os.path.isfile(speaker_embedding_meta):
+		with open(speaker_embedding_meta, 'w', encoding='utf-8') as f:
+			for i in range(hparams.speaker_num):
+				f.write('{}\n'.format(i))
+
+	speaker_embedding_meta = speaker_embedding_meta.replace(log_dir, '..')
 
 	#Book keeping
 	step = 0
@@ -363,6 +373,11 @@ def train(log_dir, args, hparams):
 					log('\nSaving Model Character Embeddings visualization..')
 					add_embedding_stats(summary_writer, [model.embedding_table.name], [char_embedding_meta], checkpoint_state.model_checkpoint_path)
 					log('Tacotron Character embeddings have been updated on tensorboard!')
+
+					#Update Projector
+					log('\nSaving Model Speaker Embeddings visualization..')
+					add_embedding_stats(summary_writer, [model.speaker_embedding_table.name], [speaker_embedding_meta], checkpoint_state.model_checkpoint_path)
+					log('Tacotron Speaker embeddings have been updated on tensorboard!')
 
 			log('Tacotron training complete after {} global steps!'.format(args.tacotron_train_steps), slack=True)
 			return save_dir

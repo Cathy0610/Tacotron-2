@@ -20,11 +20,20 @@ def prepare_run(args):
 
 def get_sentences(args):
 	if args.text_list != '':
-		with open(args.text_list, 'rb') as f:
-			sentences = list(map(lambda l: l.decode("utf-8")[:-1], f.readlines()))
+		with open(args.text_list, encoding='utf-8') as f:
+			sentences = list(map(lambda l: l.strip('\t\r\n'), f.readlines()))
 	else:
 		sentences = hparams.sentences
-	return sentences
+	texts=[]
+	speakers=[]
+	languages=[]
+	for i, line in enumerate(sentences):
+		line = line.split('|')
+		if len(line) == 3:
+			texts.append(line[0])
+			speakers.append(int(line[1]))
+			languages.append(int(line[2])) #0: English, 1: Chinese
+	return texts, speakers, languages
 
 
 
@@ -59,10 +68,10 @@ def main():
 		raise ValueError('GTA option must be either True or False')
 
 	taco_checkpoint, hparams = prepare_run(args)
-	sentences = get_sentences(args)
+	sentences, speakers, languages = get_sentences(args)
 
 	if args.model == 'Tacotron':
-		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences)
+		_ = tacotron_synthesize(args, hparams, taco_checkpoint, sentences, speakers, languages)
 	else:
 		raise ValueError('Model provided {} unknown! {}'.format(args.model, accepted_models))
 

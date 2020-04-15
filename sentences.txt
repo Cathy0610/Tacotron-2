@@ -1,19 +1,19 @@
-Scientists at the CERN laboratory say they have discovered a new particle.
-There's a way to measure the acute emotional intelligence that has never gone out of style.
-President Trump met with other leaders at the Group of 20 conference.
-The Senate's bill to repeal and replace the Affordable Care Act is now imperiled.
+Scientists at the CERN laboratory say they have discovered a new particle.|0|0
+There's a way to measure the acute emotional intelligence that has never gone out of style.|0|0
+President Trump met with other leaders at the Group of 20 conference.|0|0
+The Senate's bill to repeal and replace the Affordable Care Act is now imperiled.|0|0
 
-Generative adversarial network or variational auto-encoder.
-Basilar membrane and otolaryngology are not auto-correlations.
-He has read the whole thing.
-He reads books.
-He thought it was time to present the present.
-Thisss isrealy awhsome.
-Punctuation sensitivity, is working.
-Punctuation sensitivity is working.
-Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?
-She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.
-Tajima Airport serves Toyooka.
+Generative adversarial network or variational auto-encoder.|0|0
+Basilar membrane and otolaryngology are not auto-correlations.|0|0
+He has read the whole thing.|0|0
+He reads books.|0|0
+He thought it was time to present the present.|0|0
+Thisss isrealy awhsome.|0|0
+Punctuation sensitivity, is working.|0|0
+Punctuation sensitivity is working.|0|0
+Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?|0|0
+She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.|0|0
+Tajima Airport serves Toyooka.|0|0
 
-Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization. This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that the adopted architecture is able to perform this task with wild success.
-Thank you so much for your support!
+Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization. This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that the adopted architecture is able to perform this task with wild success.|0|0
+Thank you so much for your support!|0|0
