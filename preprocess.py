@@ -6,7 +6,7 @@ from hparams import hparams
 from tqdm import tqdm
 from datasets import ljspeech
 from datasets import databaker
-from datasets import thcoss
+from datasets import multisets
 
 
 def write_metadata(metadata, out_dir):
@@ -30,7 +30,7 @@ def main():
 	parser.add_argument('--base_dir', default='')
 	parser.add_argument('--hparams', default='',
 		help='Hyperparameter overrides as a comma-separated list of name=value pairs')
-	parser.add_argument('--dataset', default='LJSpeech-1.1')
+	parser.add_argument('--dataset', default='MultiSets')
 	parser.add_argument('--output', default='training_data')
 	parser.add_argument('--n_jobs', type=int, default=cpu_count())
 	args = parser.parse_args()
@@ -54,9 +54,8 @@ def main():
 	elif args.dataset == 'DataBaker':
 		use_prosody = True
 		metadata = databaker.build_from_path(modified_hp, in_dir, use_prosody, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
-	elif args.dataset == 'THCoSS':
-		use_prosody = True
-		metadata = thcoss.build_from_path(modified_hp, in_dir, use_prosody, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
+	elif args.dataset == 'MultiSets':
+		metadata = multisets.build_from_path(modified_hp, in_dir, mel_dir, lin_dir, wav_dir, args.n_jobs, tqdm=tqdm)
 	else:
 		raise ValueError('Unsupported dataset provided: {} '.format(args.dataset))
 	
