@@ -95,10 +95,6 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 					basenames.append('weight_{}_sentence_{}'.format(w_id, s_id))
 			
 			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None, test_alignments=test_alignments[i])
-			for mel_filename in mel_filenames:
-				npy_data = np.load(mel_filename)
-				npy_data = npy_data.reshape((-1,))
-				npy_data.tofile("%s.f32" % mel_filename)
 
 			for elems in zip(texts, mel_filenames, test_alignments[i], speaker_ids):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
@@ -151,9 +147,9 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 def tacotron_synthesize(args, hparams, checkpoint, sentences=None):
 	output_dir = 'tacotron_' + args.output_dir
 
-	# checkpoint_path = checkpoint
+	checkpoint_path = checkpoint
 	try:
-		checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
+		# checkpoint_path = tf.train.get_checkpoint_state(checkpoint).model_checkpoint_path
 		log('loaded model at {}'.format(checkpoint_path))
 	except:
 		raise RuntimeError('Failed to load checkpoint at {}'.format(checkpoint))

@@ -181,7 +181,7 @@ def train(log_dir, args, hparams):
 	step = 0
 	time_window = ValueWindow(100)
 	loss_window = ValueWindow(100)
-	saver = tf.train.Saver(max_to_keep=20)
+	saver = tf.train.Saver(max_to_keep=150)
 
 	log('Tacotron training set to a maximum of {} steps'.format(args.tacotron_train_steps))
 
@@ -366,7 +366,7 @@ def train(log_dir, args, hparams):
 
 					#save griffin lim inverted wav for debug (mel -> wav)if hparams.lpc_util:
 					if hparams.lpc_util:
-						audio.inv_lpc_feature(mel_prediction, os.path.join(eval_wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), hparams)
+						audio.inv_lpc_feature(mel_prediction, os.path.join(wav_dir, 'step-{}-wave-from-mel.wav'.format(step)), hparams)
 					else:
 						if hparams.GL_on_GPU:
 							wav = sess.run(GLGPU_mel_outputs, feed_dict={GLGPU_mel_inputs: mel_prediction})
