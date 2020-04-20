@@ -375,6 +375,8 @@ class Postnet:
 
 class GradientReversal:
 	"""Gradient Reversal layer
+
+	https://blog.csdn.net/qq_24406903/article/details/101084431
 	"""
 	#
 	# 其实使用tf.stop_gradient()函数可以更方便实现梯度反转
