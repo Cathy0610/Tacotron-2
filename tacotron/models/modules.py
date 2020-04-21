@@ -379,14 +379,22 @@ class GradientReversal:
 	https://blog.csdn.net/qq_24406903/article/details/101084431
 	"""
 	#
-	# 其实使用tf.stop_gradient()函数可以更方便实现梯度反转
+	# 使用tf.stop_gradient()函数可以更方便实现梯度反转, 但不方便应用gradient_clipping_factor
+	# 参考:
+	#  https://github.com/tachitachi/GradientReversal
 	# 方法为:
-	#  f = self.encoder(x); t = -hp.grad_rev_scale * f; rev_f = t + tf.stop_gradient(f - t)
-	# 其含义为: 
-	#  f是计算的特征;
-	#  t是负的梯度反转系数乘以f;
-	#  tf.stop_gradient()函数在前向传播时不做任何改变, 反向传播时则改项梯度为0,
-	#  所以rev_f在前向传播时的值是t+f-t, 反向传播是对t的梯度+0
+	#  def flip_gradient(x, s=1.0):
+	#    positive_path = tf.stop_gradient(x * tf.cast(1 + s, tf.float32))
+	#    negative_path = -x * tf.cast(s, tf.float32)
+	#    return positive_path + negative_path
+	# 其含义为:
+	#  x是输入;
+	#  s为梯度反转系数;
+	#  positive_path计算 x*(1+s);
+	#  negative_path计算 x*(-s);
+	#  tf.stop_gradient()函数在前向计算时不做任何改变, 反向传播时则该项梯度为0; 所以:
+	#  在前向计算时, positive_path+negative_path的总效果为 x*(1+s-s)=x;
+	#  在反向传播时, postivie_path梯度为0, negative_path梯度乘以-s
 	#
 	cnt = 0
 	def __init__(self, name="GradRevIdentity"):
@@ -428,8 +436,8 @@ class AdversarialClassifier:
 		self.hidden_size = hidden_size
 		self.class_num = class_num
 		self.scope = 'AdversarialClassifier' if scope is None else scope
-		
-		self.gradient_rev = GradientReversal()
+
+		self.gradient_rev = GradientReversal(name='gradient_reversal_{}'.format(self.scope))
 		self.hidden = tf.layers.Dense(units=self.hidden_size, activation=tf.nn.relu, name='hidden_{}'.format(self.scope))
 		self.output = tf.layers.Dense(units=self.class_num, activation=tf.nn.relu, name='output_{}'.format(self.scope))
 
