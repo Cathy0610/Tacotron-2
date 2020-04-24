@@ -91,7 +91,6 @@ class Tacotron():
 		self.tower_stop_token_prediction = []
 		self.tower_mel_outputs = []
 		self.tower_linear_outputs = []
-		self.tower_speaker_targets = []
 		self.tower_speaker_prediction = []
 
 		tower_speaker_embeddings = []
@@ -123,9 +122,6 @@ class Tacotron():
 						'speakers_embedding', [hp.speaker_num, hp.speaker_embedding_dim], dtype=tf.float32)
 					speaker_embeddings = tf.nn.embedding_lookup(self.speaker_embedding_table, tower_speaker_labels[i])
 
-					# One-hot representation of speaker labels (for Adversarial Loss)
-					speaker_targets = tf.one_hot(tower_speaker_labels[i], hp.speaker_num, dtype=tf.float32)
-
 
 					#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
 					encoder_cell = TacotronEncoderCell(
@@ -144,9 +140,7 @@ class Tacotron():
 
 					#encoder_outputs is with shape [N, T_in, encoder_lstm_units*2]
 					#speaker_prediction is predicted for each time step of input, resulting in [N, T_in, speaker_num]
-					#get speaker_prediction of the whole sentence by calculating mean along time axis, with shape [N, speaker_num]
 					speaker_prediction = speaker_classifier(encoder_outputs, hp.speaker_grad_rev_scale, hp.speaker_grad_clip_factor)
-					speaker_prediction = tf.reduce_mean(speaker_prediction, axis=1)
 
 
 					#Decoder Parts
@@ -239,7 +233,6 @@ class Tacotron():
 					self.tower_alignments.append(alignments)
 					self.tower_stop_token_prediction.append(stop_token_prediction)
 					self.tower_mel_outputs.append(mel_outputs)
-					self.tower_speaker_targets.append(speaker_targets)
 					self.tower_speaker_prediction.append(speaker_prediction)
 					tower_speaker_embeddings.append(speaker_embeddings)
 					tower_embedded_inputs.append(embedded_inputs)
@@ -366,9 +359,14 @@ class Tacotron():
 							or 'speakers_embedding' in v.name
 							or 'RNN' in v.name or 'LSTM' in v.name)]) * reg_weight
 
-					#Compute the speaker adversarial training loss
+					# Compute the speaker adversarial training loss
+					# speaker_prediction: predicted speaker label for each time step of input, with shape [N, T_in, speaker_num]
+					# speaker_targets: one-hot speaker label of current input, tiled from shape [N, speaker_num] to [N, 1, speaker_num] to [N, T_in, speaker_num]
+					speaker_targets = tf.one_hot(self.tower_speaker_labels[i], hp.speaker_num, dtype=tf.float32)
+					seq_len = tf.shape(self.tower_speaker_prediction[i])[1]
+					speaker_targets = tf.tile(tf.reshape(speaker_targets, shape=[-1, 1, hp.speaker_num]), multiples=[1, seq_len, 1])
 					adversarial_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-						labels=self.tower_speaker_targets[i],
+						labels=speaker_targets,
 						logits=self.tower_speaker_prediction[i]))
 
 					# Compute final loss term
