@@ -11,15 +11,21 @@ What you need to do:
 
 ### Example of "metadata.csv"
 
-0|0|LJSpeech-1.1/metadata.csv.txt|LJSpeech-1.1/Wave|00_0_
-1|1|DataBaker/metadata.csv.txt|DataBaker/Wave|01_1_
+  ```
+  0|0|LJSpeech-1.1/metadata.csv.txt|LJSpeech-1.1/Wave|00_0_
+  1|1|DataBaker/metadata.csv.txt|DataBaker/Wave|01_1_
+  ```
 
 
 ### Format of "metadata.csv"
 
 The "metadata.csv" stores index for each dataset.
 
-Each line of "metadata.csv" has 5 parts separated by "|", including: speaker_id|language_id|metadata_file|wavs_dir|basename_prefix
+Each line of "metadata.csv" has 5 parts separated by "|", including: 
+
+  ```
+  speaker_id|language_id|metadata_file|wavs_dir|basename_prefix
+  ```
 
 Where
   *   "metadata_file" is the metadata of the dataset, specifying "wav_file_name|raw text|text" (某个特定数据集的metadata文件);
@@ -28,4 +34,4 @@ Where
   *     "language_id" is the language_id of the dataset (特定数据集的语言标签id, 从0开始);
   * "basename_prefix" specifies the basename prefix of the generated training data (通过prefix防止多个数据集的wav文件名一样, 建议格式: 两位说话人标签_语言标签_).
 
-See [multisets.py](../datasets/multisets.py) for more information.
+See [multisets.py](datasets/multisets.py) for more information.
