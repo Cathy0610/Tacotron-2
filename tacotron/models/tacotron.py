@@ -135,7 +135,7 @@ class Tacotron():
 					enc_conv_output_shape = encoder_cell.conv_output_shape
 
 
-					#Adversarial Speaker-Classifiers,	input:encoder_output, output:predicted speaker_prediction
+					#Adversarial Speaker-Classifiers, input:encoder_output, output:predicted speaker_prediction
 					speaker_classifier = AdversarialClassifier(is_training, hidden_size=hp.speaker_hidden_layer, class_num=hp.speaker_num)
 
 					#encoder_outputs is with shape [N, T_in, encoder_lstm_units*2]
