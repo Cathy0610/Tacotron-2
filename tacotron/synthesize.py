@@ -45,17 +45,19 @@ def run_live(args, checkpoint_path, hparams):
 
 def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	if hparams.tacotron_style_transfer:
-		_sentences = []
-		for s in sentences:
-			_sentences += [s] * len(test_style_alignments.test_alignments)
-		test_alignments = test_style_alignments.test_alignments * len(sentences)
-		sentences = _sentences
-		# shape of <test_alignment>: [None, #heads, #token]
-		for _alignment in test_alignments:
-			assert hparams.tacotron_style_attention_num_heads == len(_alignment)
-			for _head in _alignment:
-				assert hparams.tacotron_n_style_token == len(_head)
+		if hparams.tacotron_style_reference_audio is None:
+			_sentences = []
+			for s in sentences:
+				_sentences += [s] * len(test_style_alignments.test_alignments)
+			test_alignments = test_style_alignments.test_alignments * len(sentences)
+			sentences = _sentences
+			
+			ref_audios = None
+		else:
+			ref_audios = hparams.tacotron_style_reference_audio
+			test_alignments = None
 	else:
+		ref_audios = None
 		test_alignments = None
 		
 
@@ -78,26 +80,46 @@ def run_eval(args, checkpoint_path, output_dir, hparams, sentences):
 	#Set inputs batch wise
 	sentences = [sentences[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(sentences), hparams.tacotron_synthesis_batch_size)]
 	test_alignments = [test_alignments[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(test_alignments), hparams.tacotron_synthesis_batch_size)] if test_alignments is not None else test_alignments
+	ref_audios = [ref_audios[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(ref_audios), hparams.tacotron_synthesis_batch_size)] if ref_audios is not None else ref_audios
 
 	log('Starting Synthesis')
 	with open(os.path.join(eval_dir, 'map.txt'), 'w') as file:
-		for i, texts in enumerate(tqdm(sentences)):
-			start = time.time()
+		if ref_audios is not None:
+			for i, texts in enumerate(tqdm(sentences)):
+				start = time.time()
 
-			if test_alignments is None:
 				basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
-			else:
+				
+				mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, mel_filenames=ref_audios[i], gst_only=(args.gst_only == 'True'))
+
+				for elems in zip(texts, mel_filenames, speaker_ids):
+					file.write('|'.join([str(x) for x in elems]) + '\n')
+		elif test_alignments is None:
+			for i, texts in enumerate(tqdm(sentences)):
+				start = time.time()
+
+				basenames = ['batch_{}_sentence_{}'.format(i, j) for j in range(len(texts))]
+				
+				mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None, gst_only=(args.gst_only == 'True'))
+
+				for elems in zip(texts, mel_filenames, speaker_ids):
+					file.write('|'.join([str(x) for x in elems]) + '\n')
+		else:
+			for i, texts in enumerate(tqdm(sentences)):
+				start = time.time()
+
 				basenames = []
 				for j, text in enumerate(texts):
 					idx = i * hparams.tacotron_synthesis_batch_size + j
 					s_id = int(idx / len(test_style_alignments.test_alignments))
 					w_id = int(idx % len(test_style_alignments.test_alignments))
 					basenames.append('weight_{}_sentence_{}'.format(w_id, s_id))
-			
-			mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None, test_alignments=test_alignments[i])
+				
+				mel_filenames, speaker_ids = synth.synthesize(texts, basenames, eval_dir, log_dir, None, test_alignments=test_alignments[i], gst_only=(args.gst_only == 'True'))
 
-			for elems in zip(texts, mel_filenames, test_alignments[i], speaker_ids):
-				file.write('|'.join([str(x) for x in elems]) + '\n')
+				for elems in zip(texts, mel_filenames, test_alignments[i], speaker_ids):
+					file.write('|'.join([str(x) for x in elems]) + '\n')
+
 	log('synthesized mel spectrograms at {}'.format(eval_dir))
 	return eval_dir
 
@@ -115,10 +137,11 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 		os.makedirs(synth_dir, exist_ok=True)
 
 
-	metadata_filename = os.path.join(args.input_dir, 'train.txt')
 	log(hparams_debug_string())
 	synth = Synthesizer()
 	synth.load(checkpoint_path, hparams, gta=GTA)
+
+	metadata_filename = os.path.join(args.input_dir, 'train_py.txt')
 	with open(metadata_filename, encoding='utf-8') as f:
 		metadata = [line.strip().split('|') for line in f]
 		frame_shift_ms = hparams.hop_size / hparams.sample_rate
@@ -129,17 +152,25 @@ def run_synthesis(args, checkpoint_path, output_dir, hparams):
 	metadata = [metadata[i: i+hparams.tacotron_synthesis_batch_size] for i in range(0, len(metadata), hparams.tacotron_synthesis_batch_size)]
 
 	log('Starting Synthesis')
-	mel_dir = os.path.join(args.input_dir, 'mels')
-	wav_dir = os.path.join(args.input_dir, 'audio')
+	if hparams.lpc_util:
+		mel_dir = os.path.join(args.input_dir, hparams.lpc_taco_train_target_dir)
+	else:
+		mel_dir = os.path.join(args.input_dir, 'mels')
+	# wav_dir = os.path.join(args.input_dir, 'audio')
 	with open(os.path.join(synth_dir, 'map.txt'), 'w') as file:
 		for i, meta in enumerate(tqdm(metadata)):
-			texts = [m[5] for m in meta]
-			mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
-			wav_filenames = [os.path.join(wav_dir, m[0]) for m in meta]
-			basenames = [os.path.basename(m).replace('.npy', '').replace('mel-', '') for m in mel_filenames]
-			mel_output_filenames, speaker_ids = synth.synthesize(texts, basenames, synth_dir, None, mel_filenames)
+			texts = [m[-1] for m in meta]
+			if hparams.lpc_util:
+				basenames = [m[1][4:-4] for m in meta]
+				mel_filenames = [os.path.join(mel_dir, m[1][4:]) for m in meta]
+			else:
+				mel_filenames = [os.path.join(mel_dir, m[1]) for m in meta]
+				basenames = [os.path.basename(m).replace('.npy', '').replace('mel-', '') for m in mel_filenames]
+			# wav_filenames = [os.path.join(wav_dir, m[0]) for m in meta]
+			mel_output_filenames, speaker_ids = synth.synthesize(texts, basenames, synth_dir, None, mel_filenames, gst_only=(args.gst_only == 'True'))
 
-			for elems in zip(wav_filenames, mel_filenames, mel_output_filenames, speaker_ids, texts):
+			# for elems in zip(wav_filenames, mel_filenames, mel_output_filenames, speaker_ids, texts):
+			for elems in zip(mel_filenames, mel_output_filenames, speaker_ids, texts):
 				file.write('|'.join([str(x) for x in elems]) + '\n')
 	log('synthesized mel spectrograms at {}'.format(synth_dir))
 	return os.path.join(synth_dir, 'map.txt')

@@ -1,6 +1,6 @@
 import argparse
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='3,4'
+os.environ['CUDA_VISIBLE_DEVICES']='4,5'
 from warnings import warn
 from time import sleep
 
@@ -19,7 +19,7 @@ def prepare_run(args):
 	os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 	run_name = args.name or args.tacotron_name or args.model
-	taco_checkpoint = os.path.join('logs-' + run_name, 'taco_' + args.checkpoint)
+	taco_checkpoint = os.path.join('logs-' + run_name, 'taco_pretrained/tacotron_model.ckpt-' + args.checkpoint)
 
 	run_name = args.name or args.wavenet_name or args.model
 	wave_checkpoint = os.path.join('logs-' + run_name, 'wave_' + args.checkpoint)
@@ -91,6 +91,7 @@ def main():
 	parser.add_argument('--GTA', default='True', help='Ground truth aligned synthesis, defaults to True, only considered in synthesis mode')
 	parser.add_argument('--text_list', default='', help='Text file contains list of texts to be synthesized. Valid if mode=eval')
 	parser.add_argument('--speaker_id', default=None, help='Defines the speakers ids to use when running standalone Wavenet on a folder of mels. this variable must be a comma-separated list of ids')
+	parser.add_argument('--gst_only', default='', help='Output GST alignment & style embedding only, excluding taco targets & waveform [Demands hparam.tacotron_style_transfer activated]')
 	args = parser.parse_args()
 
 	accepted_models = ['Tacotron', 'WaveNet', 'Tacotron-2']

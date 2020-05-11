@@ -23,12 +23,12 @@ class Synthesizer:
 		targets = tf.placeholder(tf.float32, (None, None, hparams.num_mels), name='mel_targets')
 		target_lengths = tf.placeholder(tf.int32, (None), name='target_lengths')
 		split_infos = tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos')
-		input_style_alignments = tf.placeholder(tf.float32, shape=(None, hparams.tacotron_style_attention_num_heads, hparams.tacotron_n_style_token), name='input_style_alignments')
+		input_style_alignments = tf.placeholder(tf.float32, shape=(None, 1, hparams.tacotron_style_attention_num_heads * hparams.tacotron_n_style_token), name='input_style_alignments')
 
 		with tf.variable_scope('Tacotron_model', reuse=tf.AUTO_REUSE) as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
-				self.model.initialize(inputs, input_lengths, targets, gta=gta, split_infos=split_infos)
+				self.model.initialize(inputs, input_lengths, targets, gta=gta, targets_lengths=target_lengths, split_infos=split_infos)
 			elif hparams.tacotron_style_transfer:
 				# GST-Taco synthesis test
 				# mode#1: style transfer (reference audio)
@@ -88,7 +88,7 @@ class Synthesizer:
 		saver.restore(self.session, checkpoint_path)
 
 
-	def synthesize(self, texts, basenames, out_dir, log_dir, mel_filenames, test_alignments=None):
+	def synthesize(self, texts, basenames, out_dir, log_dir, mel_filenames, test_alignments=None, gst_only=False):
 		hparams = self._hparams
 		cleaner_names = [x.strip() for x in hparams.cleaners.split(',')]
 		#[-max, max] or [0,max]
@@ -136,24 +136,27 @@ class Synthesizer:
 				split_infos[i][1] = max_target_len #Not really used but setting it in case for future development maybe?
 
 			feed_dict[self.targets] = target_seqs
+			feed_dict[self.target_lengths] = target_lengths
 			assert len(np_targets) == len(texts)
 
-
-		if hparams.tacotron_style_transfer:
+		elif hparams.tacotron_style_transfer:
 			if hparams.tacotron_style_reference_audio is not None:
 			# if hparams.tacotron_style_transfer and hparams.tacotron_style_reference_audio is not None and \
 			# 		hparams.tacotron_style_alignment is None:
 				# only support one style reference audio
-				if hparams.tacotron_style_reference_audio[-4:].lower() == '.wav':
-					wav = audio.load_wav(hparams.tacotron_style_reference_audio, sr=hparams.sample_rate)
-					np_targets = audio.melspectrogram(wav, self._hparams).astype(np.float32).T
-				else:
-					np_targets = np.load(hparams.tacotron_style_reference_audio)
-				target_lengths = len(np_targets)
+				# if hparams.tacotron_style_reference_audio[-4:].lower() == '.wav':
+				# 	wav = audio.load_wav(hparams.tacotron_style_reference_audio, sr=hparams.sample_rate)
+				# 	np_targets = audio.melspectrogram(wav, self._hparams).astype(np.float32).T
+				# else:
+				# 	np_targets = np.load(hparams.tacotron_style_reference_audio)
+				# target_lengths = len(np_targets)
+
+				np_targets = [np.load(i) for i in mel_filenames]
+				target_lengths = [len(np_target) for np_target in np_targets]
 
 				# copy
-				np_targets = [np_targets for _ in range(len(texts))]
-				target_lengths = [target_lengths for _ in range(len(texts))]
+				# np_targets = [np_targets for _ in range(len(texts))]
+				# target_lengths = [target_lengths for _ in range(len(texts))]
 
 				# pad targets according to each GPU max length
 				target_seqs = None
@@ -217,6 +220,16 @@ class Synthesizer:
 			linears = [np.clip(linear, T2_output_range[0], T2_output_range[1]) for linear in linears]
 			assert len(mels) == len(linears) == len(texts)
 
+		if hparams.tacotron_style_transfer and gst_only:
+			style_alignments = [style_alignment for gpu_style_alignments in style_alignments for style_alignment in gpu_style_alignments]
+			style_embeddings = [style_embedding for gpu_style_embeddings in style_encoder_outputs for style_embedding in gpu_style_embeddings]
+			style_alignment_filenames = [os.path.join(out_dir, 'gst-weight-{}.npy'.format(basename)) for basename in basenames]
+			style_embedding_filenames = [os.path.join(out_dir, 'gst-embedding-{}.npy'.format(basename)) for basename in basenames]
+			for sa, safn, se, sefn in zip(style_alignments, style_alignment_filenames, style_embeddings, style_embedding_filenames):
+				np.save(safn, sa, allow_pickle=False)
+				np.save(sefn, se, allow_pickle=False)
+			return style_alignment_filenames, style_embedding_filenames
+
 		if not hparams.lpc_util or hparams.lpc_scaler_path is not None:
 			mels = [np.clip(mel, T2_output_range[0], T2_output_range[1]) for mel in mels]
 
@@ -243,10 +256,10 @@ class Synthesizer:
 			return
 			
 		# style_encoder_output[device_num, batch_size, sequence length, embedding_size]
-		if self._hparams.tacotron_style_transfer and self._hparams.tacotron_style_reference_audio is not None:
-			_basename = os.path.basename(self._hparams.tacotron_style_reference_audio)
-			np.save(os.path.join(out_dir, ('%s-enc.npy' % _basename)), style_encoder_outputs[0][0][0], allow_pickle=False)
-			np.save(os.path.join(out_dir, ('%s.npy' % _basename)), style_alignments[0], allow_pickle=False)
+		# if self._hparams.tacotron_style_transfer and self._hparams.tacotron_style_reference_audio is not None:
+		# 	_basename = os.path.basename(self._hparams.tacotron_style_reference_audio)
+		# 	np.save(os.path.join(out_dir, ('%s-enc.npy' % _basename)), style_encoder_outputs[0][0][0], allow_pickle=False)
+		# 	np.save(os.path.join(out_dir, ('%s.npy' % _basename)), style_alignments[0], allow_pickle=False)
 
 		saved_mels_paths = []
 		speaker_ids = []

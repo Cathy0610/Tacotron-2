@@ -34,7 +34,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Both Tacotron and WaveNet can be trained on multi-GPU: data parallelization)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
-	tacotron_num_gpus = 4, #Determines the number of gpus in use for Tacotron training.
+	tacotron_num_gpus = 2, #Determines the number of gpus in use for Tacotron training.
 	wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training.
 	split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used. 
 		#(Recommend: False on slow CPUs/Disks, True otherwise for small speed boost)
@@ -93,7 +93,7 @@ hparams = tf.contrib.training.HParams(
 	#Mel and Linear spectrograms normalization/scaling and clipping
 	signal_normalization = False, #Whether to normalize mel spectrograms to some predefined range (following below parameters)
 	allow_clipping_in_normalization = False, #Only relevant if mel_normalization = True
-	symmetric_mels = False, #Whether to scale the data to be symmetric around 0. (Also multiplies the output range by 2, faster and cleaner convergence)
+	symmetric_mels = True, #Whether to scale the data to be symmetric around 0. (Also multiplies the output range by 2, faster and cleaner convergence)
 	max_abs_value = 4., #max absolute value of data. If symmetric, data will be [-max, max] else [0, max] (Must not be too big to avoid gradient explosion, 
 																										  #not too small for fast convergence)
 	normalize_for_wavenet = True, #whether to rescale to [0, 1] for wavenet. (better audio quality)
@@ -130,7 +130,7 @@ hparams = tf.contrib.training.HParams(
 	outputs_per_step = 2, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 	batch_norm_position = 'after', #Can be in ('before', 'after'). Determines whether we use batch norm before or after the activation function (relu). Matter for debate.
-	clip_outputs = False, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
+	clip_outputs = True, #Whether to clip spectrograms to T2_output_range (even in loss computation). ie: Don't penalize model for exceeding output range and bring back to borders.
 	lower_bound_decay = 0.1, #Small regularizer for noise synthesis by adding small range of penalty for silence regions. Set to 0 to clip in Tacotron range.
 
 	#Input parameters
@@ -189,7 +189,8 @@ hparams = tf.contrib.training.HParams(
 	#Style token layer
 	tacotron_lang = 'py', # zh / en / cmu(en) / py(pinyin)
 	tacotron_style_transfer = True,
-	tacotron_style_label = True,
+	tacotron_style_zeropad = False,
+	tacotron_style_label = False,
 	tacotron_n_style_token = 7,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
@@ -197,6 +198,7 @@ hparams = tf.contrib.training.HParams(
 	tacotron_style_attention_num_heads = 1,
     tacotron_style_reference_audio = None,
     # tacotron_style_reference_audio = 'ref_audio/story.wav',
+    # tacotron_style_reference_audio = ['training_data_22k/feat_norm/002010.npy', 'training_data_22k/feat_norm/210110.npy', 'training_data_22k/feat_norm/230178.npy', 'training_data_22k/feat_norm/221011.npy', 'training_data_22k/feat_norm/250111.npy', 'training_data_22k/feat_norm/260166.npy', 'training_data_22k/feat_norm/240014.npy'],
 	tacotron_style_encoder_output = None,
 	# tacotron_style_encoder_output = 'tacotron_tacoGST2/eval/arouse.wav-enc.npy',
     # manually specify style token alignment weights instead of getting them from reference audio
@@ -274,17 +276,17 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	#train/test split ratios, mini-batches sizes
-	tacotron_batch_size = 32*4, #number of training samples on each training steps
+	tacotron_batch_size = 32*6, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing). 
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
-	tacotron_synthesis_batch_size = 1*2, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
+	tacotron_synthesis_batch_size = 32*2, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
 	tacotron_test_size = 0.05, #% of data to keep as test data, if None, tacotron_test_batches must be not None. (5% is enough to have a good idea about overfit)
 	tacotron_test_batches = None, #number of test batches.
 
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 50000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_steps = 20000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-4, #minimal learning rate

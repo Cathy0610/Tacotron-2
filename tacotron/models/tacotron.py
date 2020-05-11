@@ -51,7 +51,7 @@ class Tacotron():
 			raise RuntimeError('Model set to mask paddings but no targets lengths provided for the mask!')
 		if is_training and is_evaluating:
 			raise RuntimeError('Model can not be in training and evaluation modes at the same time!')
-		if self._hparams.tacotron_style_transfer and (not is_training) and (not is_evaluating):
+		if self._hparams.tacotron_style_transfer and (not is_training) and (not is_evaluating) and (not gta):
 			assert (input_style_alignments is not None or
 				self._hparams.tacotron_style_reference_audio is not None or 
 				self._hparams.tacotron_style_encoder_output is not None)
@@ -135,114 +135,119 @@ class Tacotron():
 					#For shape visualization purpose
 					enc_conv_output_shape = encoder_cell.conv_output_shape
 
-					# style token layers
-					if self._hparams.tacotron_style_transfer:
-						self.style_embedding_table = tf.get_variable(
-							'style_token_embedding', [hp.tacotron_n_style_token, hp.embedding_dim], dtype=tf.float32,
-							initializer=tf.truncated_normal_initializer(stddev=0.5)
-						)
+					
 
 					# in order to synthese audio in random weights, style_encoder_outputs[-1]==style_embedding_table[-1]
-					if (is_training or is_evaluating) and self._hparams.tacotron_style_transfer:
-						style_encoder_cell = TacotronReferenceEncoderCell(
-							ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size, is_training=is_training,
-											 activation=tf.nn.relu),
-							tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
-							StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-											is_training=is_training,
-											num_heads=hp.tacotron_style_attention_num_heads),
-							hparams=hp
-						)
-						# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2]
-						style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
-																   input_lengths=tower_targets_lengths[i],
-																   style_token_embedding=self.style_embedding_table)
-						# [batch_size,seq_len,hp.encoder_lstm_units*2]
-						# encoder_outputs = encoder_outputs + style_encoder_outputs  # element-wise add
-						seq_len = tf.shape(encoder_outputs)[1]
-						style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
-						encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-					elif (not is_training) and (not is_evaluating) and self._hparams.tacotron_style_transfer:  # synthesis with style transfer
-						if tower_input_style_alignments is not None:
-							# shape of tower_input_style_alignments[i]: [batch_size(size_per_device), #heads, #token]
-							# shape of input_alignment: [batch_size * #heads, 1, #token]
-							input_alignment = tf.concat(tf.split(tower_input_style_alignments[i], hp.tacotron_style_attention_num_heads, axis=1), axis=0)
-							style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-												is_training=is_training)
-							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
-														multiples=[batch_size, 1, 1])
-							style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
-																		token_embedding=token_embedding,
-																		input_alignment=input_alignment)
-							seq_len = tf.shape(encoder_outputs)[1]
-							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
-							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-						elif len(tower_mel_targets) > 0 and tower_mel_targets[i] is not None:
-							# reference audio
-							style_encoder_cell = TacotronReferenceEncoderCell(
-								ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size,
-												 is_training=is_training, activation=tf.nn.relu),
-								tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
-								StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-												is_training=is_training,
-												num_heads=hp.tacotron_style_attention_num_heads),
-								hparams=hp
+					if self._hparams.tacotron_style_zeropad:
+						_paddings = tf.constant([[0, 0], [0, 0], [0, self._hparams.tacotron_style_encoder_outputs_size]])
+						encoder_outputs = tf.pad(encoder_outputs, _paddings, mode='CONSTANT', constant_values=0)
+					# style token layers
+					if self._hparams.tacotron_style_transfer:
+						with tf.variable_scope('gst') as scope:
+							self.style_embedding_table = tf.get_variable(
+								'style_token_embedding', [hp.tacotron_n_style_token, hp.embedding_dim], dtype=tf.float32,
+								initializer=tf.truncated_normal_initializer(stddev=0.5)
 							)
-							# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2(hp.tacotron_style_encoder_outputs_size)]
-							style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
-																	   # audio style reference audio
-																	   input_lengths=tower_targets_lengths[i],
-																	   style_token_embedding=self.style_embedding_table)
-							# [batch_size,seq_len,hp.encoder_lstm_units*2]
-							# encoder_outputs = encoder_outputs + style_encoder_outputs  # element-wise add
-							seq_len = tf.shape(encoder_outputs)[1]
-							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
-							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-						elif hp.tacotron_style_encoder_output is not None:
-							style_encoder_outputs = np.load(hp.tacotron_style_encoder_output)
-							style_encoder_outputs = np.expand_dims(np.expand_dims(style_encoder_outputs, axis=0), axis=0)
-							style_encoder_outputs = tf.convert_to_tensor(style_encoder_outputs, dtype=tf.float32)
-							seq_len = tf.shape(encoder_outputs)[1]
-							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[batch_size, seq_len, 1])
-							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-						elif hp.tacotron_style_mh_alignment is not None:
-							# shape of <hp.tacotron_style_mh_alignment>: [#token, ]
-							input_alignment = tf.convert_to_tensor(hp.tacotron_style_mh_alignment, dtype=tf.float32)
-							input_alignment = tf.tile(tf.expand_dims(tf.expand_dims(input_alignment, axis=0), axis=0),
-														multiples=[hp.tacotron_style_attention_num_heads*batch_size, 1, 1])
-							style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-												is_training=is_training)
-							token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
-														multiples=[batch_size, 1, 1])
-							style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
-																		token_embedding=token_embedding,
-																		input_alignment=input_alignment)
-							seq_len = tf.shape(encoder_outputs)[1]
-							style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
-							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
-						elif hp.tacotron_style_alignment is not None and \
-								len(hp.tacotron_style_alignment) == hp.tacotron_n_style_token:
-							# random weights
-							# [n_style_tokens,]
-							style_alignment = tf.convert_to_tensor(hp.tacotron_style_alignment, dtype=tf.float32)
-							# [n_style_tokens,1]*[n_style_tokens, embed_size] -> [n_style_tokens,embed_size] -> [embed_size,]
-							# token_embedding = tf.layers.dense(token_embedding, hp.tacotron_style_encoder_outputs_size, use_bias=False)  # (N, T_k, C)
-							style_context = tf.reduce_sum(
-								tf.expand_dims(style_alignment, axis=-1) * token_embedding, axis=0)
-							# [1,embed_size]
-							style_context = tf.expand_dims(style_context, axis=0)
-							# [batch_size,1,embed_size], all synthesis audio should be one style
-							style_context = tf.tile(tf.expand_dims(style_context, axis=0), multiples=[batch_size, 1, 1])
-							# encoder_outputs = encoder_outputs + style_context  # element-wise add
-							seq_len = tf.shape(encoder_outputs)[1]
-							# style_context = tf.tile(style_context, multiples=[1, seq_len, 1])
-							style_encoder_outputs = tf.tile(style_context, multiples=[1, seq_len, 1])
+							if is_training or is_evaluating:
+								style_encoder_cell = TacotronReferenceEncoderCell(
+									ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size, is_training=is_training,
+													activation=tf.nn.relu),
+									tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
+									StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
+													is_training=is_training,
+													num_heads=hp.tacotron_style_attention_num_heads),
+									hparams=hp
+								)
+								# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2]
+								style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
+																		input_lengths=tower_targets_lengths[i],
+																		style_token_embedding=self.style_embedding_table)
+								# [batch_size,seq_len,hp.encoder_lstm_units*2]
+								# encoder_outputs = encoder_outputs + style_encoder_outputs  # element-wise add
+								seq_len = tf.shape(encoder_outputs)[1]
+								style_encoder_outputs_tiled = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
+								encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs_tiled], axis=-1)  # concat
+							elif (not is_training) and (not is_evaluating):  # synthesis with style transfer
+								if len(tower_mel_targets) > 0 and tower_mel_targets[i] is not None:
+									# reference audio
+									style_encoder_cell = TacotronReferenceEncoderCell(
+										ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size,
+														is_training=is_training, activation=tf.nn.relu),
+										tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
+										StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
+														is_training=is_training,
+														num_heads=hp.tacotron_style_attention_num_heads),
+										hparams=hp
+									)
+									# style_encoder_outputs: [batch_size,1,hp.encoder_lstm_units*2(hp.tacotron_style_encoder_outputs_size)]
+									style_encoder_outputs, style_logits, style_alignment = style_encoder_cell(tower_mel_targets[i],
+																			# audio style reference audio
+																			input_lengths=tower_targets_lengths[i],
+																			style_token_embedding=self.style_embedding_table)
+									# [batch_size,seq_len,hp.encoder_lstm_units*2]
+									# encoder_outputs = encoder_outputs + style_encoder_outputs  # element-wise add
+									seq_len = tf.shape(encoder_outputs)[1]
+									style_encoder_outputs_tiled = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
+									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs_tiled], axis=-1)  # concat
+								elif tower_input_style_alignments is not None:
+									# shape of tower_input_style_alignments[i]: [batch_size(size_per_device), 1, #heads * #token]
+									# shape of input_alignment: [batch_size * #heads, 1, #token]
+									input_alignment = tf.concat(tf.split(tower_input_style_alignments[i], hp.tacotron_style_attention_num_heads, axis=2), axis=0)
+									style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
+														is_training=is_training)
+									token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
+																multiples=[batch_size, 1, 1])
+									style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
+																				token_embedding=token_embedding,
+																				input_alignment=input_alignment)
+									seq_len = tf.shape(encoder_outputs)[1]
+									style_encoder_outputs_tiled = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
+									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs_tiled], axis=-1)  # concat
+								elif hp.tacotron_style_encoder_output is not None:
+									style_encoder_outputs = np.load(hp.tacotron_style_encoder_output)
+									style_encoder_outputs = np.expand_dims(np.expand_dims(style_encoder_outputs, axis=0), axis=0)
+									style_encoder_outputs = tf.convert_to_tensor(style_encoder_outputs, dtype=tf.float32)
+									seq_len = tf.shape(encoder_outputs)[1]
+									style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[batch_size, seq_len, 1])
+									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
+								elif hp.tacotron_style_mh_alignment is not None:
+									# shape of <hp.tacotron_style_mh_alignment>: [#token, ]
+									input_alignment = tf.convert_to_tensor(hp.tacotron_style_mh_alignment, dtype=tf.float32)
+									input_alignment = tf.tile(tf.expand_dims(tf.expand_dims(input_alignment, axis=0), axis=0),
+																multiples=[hp.tacotron_style_attention_num_heads*batch_size, 1, 1])
+									style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
+														is_training=is_training)
+									token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
+																multiples=[batch_size, 1, 1])
+									style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
+																				token_embedding=token_embedding,
+																				input_alignment=input_alignment)
+									seq_len = tf.shape(encoder_outputs)[1]
+									style_encoder_outputs = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
+									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
+								elif hp.tacotron_style_alignment is not None and \
+										len(hp.tacotron_style_alignment) == hp.tacotron_n_style_token:
+									# random weights
+									# [n_style_tokens,]
+									style_alignment = tf.convert_to_tensor(hp.tacotron_style_alignment, dtype=tf.float32)
+									# [n_style_tokens,1]*[n_style_tokens, embed_size] -> [n_style_tokens,embed_size] -> [embed_size,]
+									# token_embedding = tf.layers.dense(token_embedding, hp.tacotron_style_encoder_outputs_size, use_bias=False)  # (N, T_k, C)
+									style_context = tf.reduce_sum(
+										tf.expand_dims(style_alignment, axis=-1) * token_embedding, axis=0)
+									# [1,embed_size]
+									style_context = tf.expand_dims(style_context, axis=0)
+									# [batch_size,1,embed_size], all synthesis audio should be one style
+									style_context = tf.tile(tf.expand_dims(style_context, axis=0), multiples=[batch_size, 1, 1])
+									# encoder_outputs = encoder_outputs + style_context  # element-wise add
+									seq_len = tf.shape(encoder_outputs)[1]
+									# style_context = tf.tile(style_context, multiples=[1, seq_len, 1])
+									style_encoder_outputs = tf.tile(style_context, multiples=[1, seq_len, 1])
 
-							# dense?
-							# style_context = tf.layers.dense(style_context, units=hp.tacotron_style_encoder_outputs_size,
-							#								 activation=tf.nn.tanh)
-							# encoder_outputs = tf.concat([encoder_outputs, style_context], axis=-1)  # concat
-							encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
+									# dense?
+									# style_context = tf.layers.dense(style_context, units=hp.tacotron_style_encoder_outputs_size,
+									#								 activation=tf.nn.tanh)
+									# encoder_outputs = tf.concat([encoder_outputs, style_context], axis=-1)  # concat
+									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs], axis=-1)  # concat
 
 
 
@@ -344,11 +349,11 @@ class Tacotron():
 					alignments = tf.transpose(final_decoder_state.alignment_history.stack(), [1, 2, 0])
 
 					if self._hparams.tacotron_style_transfer:
-						if self._hparams.tacotron_style_reference_audio is not None:
-							if (not is_training) and (not is_evaluating):
-								if self._hparams.tacotron_style_encoder_output is None:
-									self.tower_style_alignments.append(style_alignment)
-								self.tower_style_encoder_outputs.append(style_encoder_outputs)
+						# if self._hparams.tacotron_style_reference_audio is not None:
+						# 	if (not is_training) and (not is_evaluating):
+						# 		if self._hparams.tacotron_style_encoder_output is None:
+						self.tower_style_alignments.append(style_alignment)
+						self.tower_style_encoder_outputs.append(style_encoder_outputs)
 						self.tower_style_logits.append(tf.squeeze(style_logits, [1]))
 					
 					self.tower_decoder_output.append(decoder_output)

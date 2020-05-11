@@ -201,15 +201,23 @@ def train(log_dir, args, hparams):
 			if args.restore:
 				# Restore saved model if the user requested it, default = True
 				try:
-					checkpoint_state = tf.train.get_checkpoint_state(save_dir)
+					if args.taco_ckpt is None:
+						checkpoint_state = tf.train.get_checkpoint_state(save_dir)
 
-					if (checkpoint_state and checkpoint_state.model_checkpoint_path):
-						log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
-						saver.restore(sess, checkpoint_state.model_checkpoint_path)
+						if (checkpoint_state and checkpoint_state.model_checkpoint_path):
+							log('Loading checkpoint {}'.format(checkpoint_state.model_checkpoint_path), slack=True)
+							saver.restore(sess, checkpoint_state.model_checkpoint_path)
 
+						else:
+							log('No model to load at {}'.format(save_dir), slack=True)
+							saver.save(sess, checkpoint_path, global_step=global_step)
 					else:
-						log('No model to load at {}'.format(save_dir), slack=True)
+						log('Loading checkpoint {}'.format(args.taco_ckpt), slack=True)
+						v = [v for v in tf.global_variables() if '/gst/' not in v.name]
+						restorer = tf.train.Saver(var_list = v)
+						restorer.restore(sess, args.taco_ckpt)
 						saver.save(sess, checkpoint_path, global_step=global_step)
+
 
 				except tf.errors.OutOfRangeError as e:
 					log('Cannot restore checkpoint: {}'.format(e), slack=True)
