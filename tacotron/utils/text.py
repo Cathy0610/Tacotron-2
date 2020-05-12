@@ -39,6 +39,33 @@ def text_to_sequence(text, cleaner_names, lang='zh'):
 
   # text = _clean_text(text, cleaner_names)
   symbolsequence = text.split() if lang != 'en' else list(text)
+
+  if lang == 'py2':
+    for symbol in symbolsequence:
+      # 1. tone annotation
+      if symbol.isdigit():
+        for idx in range(-1, -1-len(sequence), -1):
+          if len(sequence[idx]) == 2:
+            break
+          else:
+            sequence[idx].append(int(symbol))
+      elif _should_keep_symbol(symbol):
+        # 2. phoneme
+        if symbol.isalpha():
+          # 2.1 unvoiced phonemes
+          if symbol in ['b', 'p', 'f', 'd', 't', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'z', 'c', 's']:
+            sequence.append([_symbol_to_id[symbol], 0])
+          # 2.2 other phonemes
+          else:
+            sequence.append([_symbol_to_id[symbol]])
+        # 3. prosodic struct
+        else:
+          sequence.append([_symbol_to_id[symbol], 0])
+      elif len(symbol):
+        raise NameError("unkown symbol name: %s" % symbol)
+    return sequence
+
+  
   if lang == 'cmu':
     symbolsequence = [symbol.rstrip('3') for symbol in symbolsequence]
   
@@ -60,6 +87,7 @@ def text_to_sequence(text, cleaner_names, lang='zh'):
 
   # Append EOS token
   sequence.append(_symbol_to_id['~'])
+  sequence = [[i] for i in sequence]
   return sequence
 
 

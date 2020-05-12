@@ -138,16 +138,19 @@ _py_tones = ['1', '2', '3', '4', '5', '6']
 _py_prosodic_struct = ['-', '`', '/', ',', '.']
 
 py_symbols = [_pad, _eos] + _py_initials + _py_finals + _py_retroflex + _py_tones + _py_prosodic_struct
+py2_symbols = [_pad, _eos] + _py_initials + _py_finals + _py_retroflex + _py_prosodic_struct
 
 en_symbols = [_pad, _eos, _sep] + list(_characters)
 
 cmu_symbols = [_pad, _eos, _sep, _slash] + cmudict.valid_symbols
 
 def getSymbolSet(lang):
-    if lang == 'zh':
-        return symbols
+    if lang == 'py2':
+        return py2_symbols
     elif lang == 'py':
         return py_symbols
+    elif lang == 'zh':
+        return symbols
     elif lang == 'cmu':
         return cmu_symbols
     elif lang == 'en':

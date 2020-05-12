@@ -76,7 +76,7 @@ class Feeder:
 			# Create placeholders for inputs and targets. Don't specify batch size because we want
 			# to be able to feed different batch sizes at eval time.
 			self._placeholders = [
-			tf.placeholder(tf.int32, shape=(None, None), name='inputs'),
+			tf.placeholder(tf.int32, shape=(None, None, hparams.tacotron_input_channel), name='inputs'),
 			tf.placeholder(tf.int32, shape=(None, ), name='input_lengths'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='mel_targets'),
 			tf.placeholder(tf.float32, shape=(None, None), name='token_targets'),
@@ -256,7 +256,7 @@ class Feeder:
 		return np.stack([self._pad_token_target(t, data_len) for t in targets]), data_len
 
 	def _pad_input(self, x, length):
-		return np.pad(x, (0, length - x.shape[0]), mode='constant', constant_values=self._pad)
+		return np.pad(x, ((0, length - x.shape[0]), (0, 0)), mode='constant', constant_values=self._pad)
 
 	def _pad_target(self, t, length):
 		return np.pad(t, [(0, length - t.shape[0]), (0, 0)], mode='constant', constant_values=self._target_pad)

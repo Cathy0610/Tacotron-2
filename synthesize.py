@@ -52,7 +52,7 @@ def get_sentences(args, lang):
 		with open(args.text_list, 'r') as f:
 			if lang == 'zh':
 				sentences = list(map(parse_sentence_zh, f.readlines()))
-			elif lang == 'py':
+			elif lang == 'py' or lang == 'py2':
 				sentences = list(map(parse_sentence_py, f.readlines()))
 			else:
 				sentences = [line.strip() for line in f.readlines()]

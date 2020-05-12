@@ -18,7 +18,7 @@ class Synthesizer:
 	def load(self, checkpoint_path, hparams, gta=False, model_name='Tacotron'):
 		log('Constructing model: %s' % model_name)
 		#Force the batch size to be known in order to use attention masking in batch synthesis
-		inputs = tf.placeholder(tf.int32, (None, None), name='inputs')
+		inputs = tf.placeholder(tf.int32, (None, None, hparams.tacotron_input_channel), name='inputs')
 		input_lengths = tf.placeholder(tf.int32, (None), name='input_lengths')
 		targets = tf.placeholder(tf.float32, (None, None, hparams.num_mels), name='mel_targets')
 		target_lengths = tf.placeholder(tf.int32, (None), name='target_lengths')
@@ -324,7 +324,7 @@ class Synthesizer:
 		return np.stack([self._pad_input(x, max_len) for x in inputs]), max_len
 
 	def _pad_input(self, x, length):
-		return np.pad(x, (0, length - x.shape[0]), mode='constant', constant_values=self._pad)
+		return np.pad(x, ((0, length - x.shape[0]), (0, 0)), mode='constant', constant_values=self._pad)
 
 	def _prepare_targets(self, targets, alignment):
 		max_len = max([len(t) for t in targets])

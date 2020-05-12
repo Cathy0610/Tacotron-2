@@ -7,7 +7,6 @@ from tensorflow.contrib.seq2seq import dynamic_decode
 from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell, TacotronReferenceEncoderCell
 from tacotron.models.custom_decoder import CustomDecoder
 from tacotron.models.attention import LocationSensitiveAttention, BahdanauStepwiseMonotonicAttention
-
 import numpy as np
 
 def split_func(x, split_pos):
@@ -67,28 +66,36 @@ class Tacotron():
 			tower_input_emo_labels = tf.split(input_emo_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if input_emo_labels is not None else input_emo_labels
 			tower_input_style_alignments = tf.split(input_style_alignments, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if input_style_alignments is not None else input_style_alignments
 
+			# inputs.shape: (batchsize_per_device, sum(maxInputLength of each device), tacotron_input_channel)
+			# p_inputs.shape: (num of devices, batchsize_per_device, maxInputLength, tacotron_input_channel)
+			# tower_inputs.shape = (num of devices, batchsize_per_device, maxInputLength)
+			# tower_input_tones.shape = (num of devices, batchsize_per_device, maxInputLength)
 			p_inputs = tf.py_func(split_func, [inputs, split_infos[:, 0]], lout_int)
 			p_mel_targets = tf.py_func(split_func, [mel_targets, split_infos[:,1]], lout_float) if mel_targets is not None else mel_targets
 			p_stop_token_targets = tf.py_func(split_func, [stop_token_targets, split_infos[:,2]], lout_float) if stop_token_targets is not None else stop_token_targets
 			p_linear_targets = tf.py_func(split_func, [linear_targets, split_infos[:,3]], lout_float) if linear_targets is not None else linear_targets
 
 			tower_inputs = []
+			tower_input_tones = []
 			tower_mel_targets = []
 			tower_stop_token_targets = []
 			tower_linear_targets = []
 
 			batch_size = tf.shape(inputs)[0]
+			input_channels = hp.tacotron_input_channel
 			mel_channels = hp.num_mels
 			linear_channels = hp.num_freq
 			for i in range (hp.tacotron_num_gpus):
-				tower_inputs.append(tf.reshape(p_inputs[i], [batch_size, -1]))
+				_input_splited = [tf.squeeze(channel, axis=-1) for channel in tf.split(tf.reshape(p_inputs[i], [batch_size, -1, input_channels]), num_or_size_splits=input_channels, axis=-1)]
+				tower_inputs.append(_input_splited[0])
+				if hp.tacotron_lang == 'py2':
+					tower_input_tones.append(_input_splited[1])
 				if p_mel_targets is not None:
 					tower_mel_targets.append(tf.reshape(p_mel_targets[i], [batch_size, -1, mel_channels]))
 				if p_stop_token_targets is not None:
 					tower_stop_token_targets.append(tf.reshape(p_stop_token_targets[i], [batch_size, -1]))
 				if p_linear_targets is not None:
 					tower_linear_targets.append(tf.reshape(p_linear_targets[i], [batch_size, -1, linear_channels]))
-
 		T2_output_range = (-hp.max_abs_value, hp.max_abs_value) if hp.symmetric_mels else (0, hp.max_abs_value)
 
 		self.tower_decoder_output = []
@@ -119,10 +126,17 @@ class Tacotron():
 					post_condition = hp.predict_linear and not gta
 
 					# Embeddings ==> [batch_size, sequence_length, embedding_dim]
+					embedding_dim = hp.embedding_dim
+					if hp.tacotron_lang == 'py2':
+						embedding_dim -= hp.tacotron_tone_category
+
 					self.embedding_table = tf.get_variable(
-						'inputs_embedding', [len(getSymbolSet(hp.tacotron_lang)), hp.embedding_dim], dtype=tf.float32)
+						'inputs_embedding', [len(getSymbolSet(hp.tacotron_lang)), embedding_dim], dtype=tf.float32)
 					embedded_inputs = tf.nn.embedding_lookup(self.embedding_table, tower_inputs[i])
 
+					if hp.tacotron_lang == 'py2':
+						embedded_tones = tf.one_hot(tower_input_tones[i], depth=hp.tacotron_tone_category, axis=-1, dtype=tf.float32)
+						embedded_inputs = tf.concat([embedded_inputs, embedded_tones], axis=-1)
 
 					#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
 					encoder_cell = TacotronEncoderCell(
