@@ -484,6 +484,28 @@ def MaskedLinearLoss(targets, outputs, targets_lengths, hparams, mask=None):
 
 	return 0.5 * mean_l1 + 0.5 * mean_l1_low
 
+def softmax_focal_loss(labels, logits, alpha=None, gamma=0):
+	'''
+	@param label (tf.int32): [batch_size] (NOT one-hot!)
+	@param logits (tf.float32): [batch_size, num_of_cls]
+	@param alpha : [num_of_cls]
+	@return : focal_loss = - alphat
+	'''
+	labels = tf.cast(labels, tf.int32)
+
+	if alpha is not None:
+		alpha = tf.constant(alpha, dtype=tf.float32)
+		a_t = tf.gather(alpha, labels, axis=0) # -> [batch_size, 1]
+	
+	labels = tf.reshape(labels, [-1, 1])
+	logits = tf.gather(logits, labels, axis=1) # -> [batch_size, 1]
+	p_t = tf.reshape(tf.nn.softmax(logits), [-1]) # -> [batch_size]
+	log_p_t = -tf.log(p_t) # - log(p_t)
+	
+	if alpha is not None:
+		log_p_t = a_t * log_p_t	# - a_t * log(p_t)
+
+	return tf.reduce_mean(tf.pow((1-pt), float(gamma)) * log_p_t) # - a_t * (1 - p_t)^gamma * log(p_t)
 
 
 def shape_list(x):

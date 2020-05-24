@@ -213,7 +213,7 @@ def train(log_dir, args, hparams):
 							saver.save(sess, checkpoint_path, global_step=global_step)
 					else:
 						log('Loading checkpoint {}'.format(args.taco_ckpt), slack=True)
-						v = [v for v in tf.global_variables() if '/gst/' not in v.name]
+						v = [v for v in tf.global_variables() if ('/gst/' not in v.name) and ('global_step' not in v.name)]
 						restorer = tf.train.Saver(var_list = v)
 						restorer.restore(sess, args.taco_ckpt)
 						saver.save(sess, checkpoint_path, global_step=global_step)

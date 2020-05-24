@@ -156,7 +156,7 @@ class Tacotron():
 						_paddings = tf.constant([[0, 0], [0, 0], [0, self._hparams.tacotron_style_encoder_outputs_size]])
 						encoder_outputs = tf.pad(encoder_outputs, _paddings, mode='CONSTANT', constant_values=0)
 					# style token layers
-					if self._hparams.tacotron_style_transfer:
+					elif self._hparams.tacotron_style_transfer:
 						with tf.variable_scope('gst') as scope:
 							self.style_embedding_table = tf.get_variable(
 								'style_token_embedding', [hp.tacotron_n_style_token, hp.embedding_dim], dtype=tf.float32,
@@ -181,6 +181,7 @@ class Tacotron():
 								seq_len = tf.shape(encoder_outputs)[1]
 								style_encoder_outputs_tiled = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
 								encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs_tiled], axis=-1)  # concat
+								# encoder_outputs = encoder_outputs + style_encoder_outputs_tiled
 							elif (not is_training) and (not is_evaluating):  # synthesis with style transfer
 								if len(tower_mel_targets) > 0 and tower_mel_targets[i] is not None:
 									# reference audio
@@ -203,6 +204,7 @@ class Tacotron():
 									seq_len = tf.shape(encoder_outputs)[1]
 									style_encoder_outputs_tiled = tf.tile(style_encoder_outputs, multiples=[1, seq_len, 1])
 									encoder_outputs = tf.concat([encoder_outputs, style_encoder_outputs_tiled], axis=-1)  # concat
+									# encoder_outputs = encoder_outputs + style_encoder_outputs_tiled
 								elif tower_input_style_alignments is not None:
 									# shape of tower_input_style_alignments[i]: [batch_size(size_per_device), 1, #heads * #token]
 									# shape of input_alignment: [batch_size * #heads, 1, #token]
@@ -459,8 +461,10 @@ class Tacotron():
 						
 						# Compute emo label loss
 						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
-							emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
+							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], \
+								alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
+							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
+							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
 						else:
 							emo_loss = 0.
 						
@@ -483,8 +487,10 @@ class Tacotron():
 						
 						# Compute emo label loss
 						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
-							emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
+							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], \
+								alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
+							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
+							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
 						else:
 							emo_loss = 0.
 
@@ -520,7 +526,7 @@ class Tacotron():
 					self.tower_linear_loss.append(linear_loss)
 					self.tower_emo_loss.append(emo_loss)
 
-					tower_loss = before + after + stop_token_loss + regularization + linear_loss + emo_loss
+					tower_loss = before + after + stop_token_loss + regularization + linear_loss + (emo_loss * self._hparams.tacotron_style_emo_loss_weight)
 					self.tower_loss.append(tower_loss)
 
 			total_before_loss += before

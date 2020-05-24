@@ -220,7 +220,7 @@ class Synthesizer:
 			linears = [np.clip(linear, T2_output_range[0], T2_output_range[1]) for linear in linears]
 			assert len(mels) == len(linears) == len(texts)
 
-		if hparams.tacotron_style_transfer and gst_only:
+		if hparams.tacotron_style_transfer:
 			style_alignments = [style_alignment for gpu_style_alignments in style_alignments for style_alignment in gpu_style_alignments]
 			style_embeddings = [style_embedding for gpu_style_embeddings in style_encoder_outputs for style_embedding in gpu_style_embeddings]
 			style_alignment_filenames = [os.path.join(out_dir, 'gst-weight-{}.npy'.format(basename)) for basename in basenames]
@@ -228,7 +228,8 @@ class Synthesizer:
 			for sa, safn, se, sefn in zip(style_alignments, style_alignment_filenames, style_embeddings, style_embedding_filenames):
 				np.save(safn, sa, allow_pickle=False)
 				np.save(sefn, se, allow_pickle=False)
-			return style_alignment_filenames, style_embedding_filenames
+			if gst_only:
+				return style_alignment_filenames, style_embedding_filenames
 
 		if not hparams.lpc_util or hparams.lpc_scaler_path is not None:
 			mels = [np.clip(mel, T2_output_range[0], T2_output_range[1]) for mel in mels]

@@ -34,7 +34,7 @@ hparams = tf.contrib.training.HParams(
 
 	#Hardware setup: Default supposes user has only one GPU: "/gpu:0" (Both Tacotron and WaveNet can be trained on multi-GPU: data parallelization)
 	#Synthesis also uses the following hardware parameters for multi-GPU parallel synthesis.
-	tacotron_num_gpus = 4, #Determines the number of gpus in use for Tacotron training.
+	tacotron_num_gpus = 6, #Determines the number of gpus in use for Tacotron training.
 	wavenet_num_gpus = 1, #Determines the number of gpus in use for WaveNet training.
 	split_on_cpu = True, #Determines whether to split data on CPU or on first GPU. This is automatically True when more than 1 GPU is used. 
 		#(Recommend: False on slow CPUs/Disks, True otherwise for small speed boost)
@@ -190,15 +190,16 @@ hparams = tf.contrib.training.HParams(
 	tacotron_lang = 'py2', # zh / en / cmu(en) / py(pinyin)
 	tacotron_input_channel = 2, # 1: zh/en/cmu/py; 2: py2
 	tacotron_tone_category = 7, # [tone1~6, unvoiced/silence] (ONLY for lang=='py2')
-	tacotron_style_transfer = False,
+	tacotron_style_transfer = True,
 	tacotron_style_zeropad = False,
-	tacotron_style_label = False,
-	tacotron_n_style_token = 7,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
+	tacotron_style_label = True,
+	tacotron_n_style_token = 10,  # number of style tokens (when set tacotron_style_label=True, make sure it equals to num of emo label)
     tacotron_reference_layer_size = (32, 32, 64, 64, 128, 128),  # filters of style token layer
     tacotron_reference_gru_hidden_size = 128,  # hidden size
+	tacotron_style_emo_loss_weight = 0.45, # valid only when hp.style_label is True
     tacotron_style_encoder_outputs_size = 512,  # dim of style token layer output
 	tacotron_style_attention_num_heads = 1,
-    tacotron_style_reference_audio = None,
+    # tacotron_style_reference_audio = None,
     # tacotron_style_reference_audio = 'ref_audio/story.wav',
     # tacotron_style_reference_audio = ['training_data_22k/feat_norm/002010.npy', 'training_data_22k/feat_norm/210110.npy', 'training_data_22k/feat_norm/230178.npy', 'training_data_22k/feat_norm/221011.npy', 'training_data_22k/feat_norm/250111.npy', 'training_data_22k/feat_norm/260166.npy', 'training_data_22k/feat_norm/240014.npy'],
 	tacotron_style_encoder_output = None,
@@ -278,17 +279,17 @@ hparams = tf.contrib.training.HParams(
 	tacotron_swap_with_cpu = False, #Whether to use cpu as support to gpu for decoder computation (Not recommended: may cause major slowdowns! Only use when critical!)
 
 	#train/test split ratios, mini-batches sizes
-	tacotron_batch_size = 32*4, #number of training samples on each training steps
+	tacotron_batch_size = 32*6, #number of training samples on each training steps
 	#Tacotron Batch synthesis supports ~16x the training batch size (no gradients during testing). 
 	#Training Tacotron with unmasked paddings makes it aware of them, which makes synthesis times different from training. We thus recommend masking the encoder.
-	tacotron_synthesis_batch_size = 32*2, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
+	tacotron_synthesis_batch_size = 1*1, #DO NOT MAKE THIS BIGGER THAN 1 IF YOU DIDN'T TRAIN TACOTRON WITH "mask_encoder=True"!!
 	tacotron_test_size = 0.05, #% of data to keep as test data, if None, tacotron_test_batches must be not None. (5% is enough to have a good idea about overfit)
 	tacotron_test_batches = None, #number of test batches.
 
 	#Learning rate schedule
 	tacotron_decay_learning_rate = True, #boolean, determines if the learning rate will follow an exponential decay
 	tacotron_start_decay = 40000, #Step at which learning decay starts
-	tacotron_decay_steps = 20000, #Determines the learning rate decay slope (UNDER TEST)
+	tacotron_decay_steps = 10000, #Determines the learning rate decay slope (UNDER TEST)
 	tacotron_decay_rate = 0.5, #learning rate decay rate (UNDER TEST)
 	tacotron_initial_learning_rate = 1e-3, #starting learning rate
 	tacotron_final_learning_rate = 1e-4, #minimal learning rate
