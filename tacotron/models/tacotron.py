@@ -461,8 +461,7 @@ class Tacotron():
 						
 						# Compute emo label loss
 						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], \
-								alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
+							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
 							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
 							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
 						else:
@@ -487,8 +486,7 @@ class Tacotron():
 						
 						# Compute emo label loss
 						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], \
-								alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
+							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
 							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
 							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
 						else:
