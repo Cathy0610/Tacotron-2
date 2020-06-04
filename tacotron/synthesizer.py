@@ -95,6 +95,7 @@ class Synthesizer:
 		T2_output_range = (-hparams.max_abs_value, hparams.max_abs_value) if hparams.symmetric_mels else (0, hparams.max_abs_value)
 
 		#Repeat last sample until number of samples is dividable by the number of GPUs (last run scenario)
+		original_batch_size = len(texts)
 		while len(texts) % hparams.tacotron_synthesis_batch_size != 0:
 			texts.append(texts[-1])
 			basenames.append(basenames[-1])
@@ -264,7 +265,7 @@ class Synthesizer:
 
 		saved_mels_paths = []
 		speaker_ids = []
-		for i, mel in enumerate(mels):
+		for i, mel in enumerate(mels[:original_batch_size]):
 			#Get speaker id for global conditioning (only used with GTA generally)
 			if hparams.gin_channels > 0:
 				raise RuntimeError('Please set the speaker_id rule in line 99 of tacotron/synthesizer.py to allow for global condition usage later.')
