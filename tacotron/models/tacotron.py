@@ -424,7 +424,7 @@ class Tacotron():
 		log('  Tacotron Parameters       {:.3f} Million.'.format(np.sum([np.prod(v.get_shape().as_list()) for v in self.all_vars]) / 1000000))
 
 
-	def add_loss(self):
+	def add_loss(self, global_step):
 		'''Adds loss to the model. Sets "loss" field. initialize must have been called.'''
 		hp = self._hparams
 
@@ -434,6 +434,7 @@ class Tacotron():
 		self.tower_regularization_loss = []
 		self.tower_linear_loss = []
 		self.tower_emo_loss = []
+		self.tower_weighted_emo_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -442,6 +443,7 @@ class Tacotron():
 		total_regularization_loss = 0
 		total_linear_loss = 0
 		total_emo_loss = 0
+		total_weighted_emo_loss = 0
 		total_loss = 0
 
 		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_num_gpus)]
@@ -460,14 +462,6 @@ class Tacotron():
 						stop_token_loss = MaskedSigmoidCrossEntropy(self.tower_stop_token_targets[i],
 							self.tower_stop_token_prediction[i], self.tower_targets_lengths[i], hparams=self._hparams)
 						
-						# Compute emo label loss
-						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
-							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
-							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
-						else:
-							emo_loss = 0.
-						
 						#Compute masked linear loss
 						if hp.predict_linear:
 							#Compute Linear L1 mask loss (priority to low frequencies)
@@ -484,14 +478,6 @@ class Tacotron():
 						stop_token_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
 							labels=self.tower_stop_token_targets[i],
 							logits=self.tower_stop_token_prediction[i]))
-						
-						# Compute emo label loss
-						if hp.tacotron_style_label and (self.tower_input_emo_labels[i] != -1):
-							emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
-							# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
-							# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
-						else:
-							emo_loss = 0.
 
 						if hp.predict_linear:
 							#Compute linear loss
@@ -523,9 +509,27 @@ class Tacotron():
 					self.tower_stop_token_loss.append(stop_token_loss)
 					self.tower_regularization_loss.append(regularization)
 					self.tower_linear_loss.append(linear_loss)
-					self.tower_emo_loss.append(emo_loss)
 
-					tower_loss = before + after + stop_token_loss + regularization + linear_loss + (emo_loss * self._hparams.tacotron_style_emo_loss_weight)
+					# Compute emo label loss
+					if hp.tacotron_style_label:
+						emo_loss = softmax_focal_loss(labels=self.tower_input_emo_labels[i], logits=self.tower_style_logits[i], alpha=[1 for _ in range(self._hparams.tacotron_n_style_token)], gamma=2)
+						# one_hot_label = tf.one_hot(self.tower_input_emo_labels[i], depth=self._hparams.tacotron_n_style_token, dtype=tf.float32)
+						# emo_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=one_hot_label,logits=self.tower_style_logits[i]))
+
+						# actual emotional loss (for training log)
+						self.tower_emo_loss.append(emo_loss)
+						# weighted emotional loss (for total loss computation)
+						self.emo_loss_weight = self._emo_loss_weight_grow(global_step)
+						weighted_emo_loss = emo_loss * self.emo_loss_weight
+						self.tower_weighted_emo_loss.append(weighted_emo_loss)
+					else:
+						emo_loss = 0.
+						self.tower_emo_loss.append(emo_loss)
+						weighted_emo_loss = 0.
+						self.emo_loss_weight = 0.
+						self.tower_weighted_emo_loss.append(emo_loss)
+					
+					tower_loss = before + after + stop_token_loss + regularization + linear_loss + weighted_emo_loss
 					self.tower_loss.append(tower_loss)
 
 			total_before_loss += before
@@ -534,6 +538,7 @@ class Tacotron():
 			total_regularization_loss += regularization
 			total_linear_loss += linear_loss
 			total_emo_loss += emo_loss
+			total_weighted_emo_loss += weighted_emo_loss
 			total_loss += tower_loss
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
@@ -542,6 +547,7 @@ class Tacotron():
 		self.regularization_loss = total_regularization_loss / hp.tacotron_num_gpus
 		self.linear_loss = total_linear_loss / hp.tacotron_num_gpus
 		self.emo_loss = total_emo_loss / hp.tacotron_num_gpus
+		self.weighted_emo_loss = total_weighted_emo_loss / hp.tacotron_num_gpus
 		self.loss = total_loss / hp.tacotron_num_gpus
 
 	def add_optimizer(self, global_step):
@@ -637,3 +643,18 @@ class Tacotron():
 
 		#clip learning rate by max and min values (initial and final values)
 		return tf.minimum(tf.maximum(lr, hp.tacotron_final_learning_rate), init_lr)
+	
+
+	def _emo_loss_weight_grow(self, global_step):
+		hp = self._hparams
+
+		weight = tf.train.exponential_decay(hp.tacotron_emo_loss_weight_final, 
+			global_step - hp.tacotron_emo_loss_weight_start_grow, # start from hp.tacotron_emo_loss_weight_start_grow
+			hp.tacotron_emo_loss_weight_grow_steps, 
+			hp.tacotron_emo_loss_weight_grow_rate,
+			name='emo_loss_exponential_decay')
+	
+		#clip loss weight by max and min values (initial and final values)
+		weight = tf.minimum(tf.maximum(lr, hp.tacotron_emo_loss_weight_init), hp.tacotron_emo_loss_weight_final)
+
+		return hp.tacotron_emo_loss_weight_init + hp.tacotron_emo_loss_weight_final - weight # invert decay to grow

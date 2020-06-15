@@ -56,6 +56,8 @@ def add_train_stats(model, hparams):
 		tf.summary.scalar('stop_token_loss', model.stop_token_loss)
 		tf.summary.scalar('loss', model.loss)
 		tf.summary.scalar('emo_loss', model.emo_loss)
+		tf.summary.scalar('weighted_emo_loss', model.weighted_emo_loss)
+		tf.summary.scalar('emo_loss_weight', model.emo_loss_weight)
 		tf.summary.scalar('learning_rate', model.learning_rate) #Control learning rate decay speed
 		if hparams.tacotron_teacher_forcing_mode == 'scheduled':
 			tf.summary.scalar('teacher_forcing_ratio', model.ratio) #Control teacher forcing ratio decay when mode = 'scheduled'
@@ -90,7 +92,7 @@ def model_train_mode(args, feeder, hparams, global_step):
 			model.initialize(feeder.inputs, feeder.input_lengths, feeder.mel_targets, feeder.token_targets,
 				targets_lengths=feeder.targets_lengths, global_step=global_step,
 				is_training=True, split_infos=feeder.split_infos, input_emo_labels=feeder.input_emo_labels)
-		model.add_loss()
+		model.add_loss(global_step)
 		model.add_optimizer(global_step)
 		stats = add_train_stats(model, hparams)
 		return model, stats
@@ -109,7 +111,7 @@ def model_test_mode(args, feeder, hparams, global_step):
 			model.initialize(feeder.eval_inputs, feeder.eval_input_lengths, feeder.eval_mel_targets, feeder.eval_token_targets,
 				targets_lengths=feeder.eval_targets_lengths, global_step=global_step, is_training=False, is_evaluating=True, 
 				split_infos=feeder.eval_split_infos, input_emo_labels=feeder.eval_input_emo_labels)
-		model.add_loss()
+		model.add_loss(global_step)
 		return model
 
 def train(log_dir, args, hparams):
