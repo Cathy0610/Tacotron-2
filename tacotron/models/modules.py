@@ -530,8 +530,9 @@ def shape_list(x):
 
 
 class ReferenceEncoder:
-    def __init__(self, hparams, is_training=True, activation=tf.nn.relu, layer_sizes=(32, 32, 64, 64, 128, 128)):
+    def __init__(self, hparams, is_training=True, activation=tf.nn.relu, layer_sizes=(32, 32, 64, 64, 128, 128), stride_sizes=((2,2), (2,2), (2,2), (2,2), (2,2), (2,2))):
         self._layer_sizes = layer_sizes
+		self._stride_sizes = stride_sizes
         self._n_layers = len(layer_sizes)
         self._hparams = hparams
         self._is_training = is_training
@@ -543,8 +544,8 @@ class ReferenceEncoder:
         x = tf.expand_dims(inputs, axis=-1)
         for i in range(self._n_layers):
             with tf.variable_scope('reference_encoder_{}'.format(i)):
-                x = tf.layers.conv2d(x, filters=self._layer_sizes[i], kernel_size=3, strides=(2, 2), padding='same',
-                                     activation=tf.nn.relu)
+                x = tf.layers.conv2d(x, filters=self._layer_sizes[i], kernel_size=3, strides=self._stride_sizes[i],
+                                     padding='same', activation=tf.nn.relu)
                 x = tf.layers.batch_normalization(x, training=self._is_training)
                 if self._activation is not None:
                     x = self._activation(x)

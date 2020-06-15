@@ -164,8 +164,8 @@ class Tacotron():
 							)
 							if is_training or is_evaluating:
 								style_encoder_cell = TacotronReferenceEncoderCell(
-									ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size, is_training=is_training,
-													activation=tf.nn.relu),
+									ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size,
+													stride_sizes=hp.tacotron_reference_stride_size, is_training=is_training, activation=tf.nn.relu),
 									tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
 									StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
 													is_training=is_training,
@@ -187,7 +187,7 @@ class Tacotron():
 									# reference audio
 									style_encoder_cell = TacotronReferenceEncoderCell(
 										ReferenceEncoder(hp, layer_sizes=hp.tacotron_reference_layer_size,
-														is_training=is_training, activation=tf.nn.relu),
+														stride_sizes=hp.tacotron_reference_stride_size, is_training=is_training, activation=tf.nn.relu),
 										tf.nn.rnn_cell.GRUCell(num_units=hp.tacotron_reference_gru_hidden_size),
 										StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
 														is_training=is_training,
