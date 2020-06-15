@@ -532,7 +532,7 @@ def shape_list(x):
 class ReferenceEncoder:
     def __init__(self, hparams, is_training=True, activation=tf.nn.relu, layer_sizes=(32, 32, 64, 64, 128, 128), stride_sizes=((2,2), (2,2), (2,2), (2,2), (2,2), (2,2))):
         self._layer_sizes = layer_sizes
-		self._stride_sizes = stride_sizes
+        self._stride_sizes = stride_sizes
         self._n_layers = len(layer_sizes)
         self._hparams = hparams
         self._is_training = is_training

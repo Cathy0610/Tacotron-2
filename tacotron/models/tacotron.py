@@ -655,6 +655,6 @@ class Tacotron():
 			name='emo_loss_exponential_decay')
 	
 		#clip loss weight by max and min values (initial and final values)
-		weight = tf.minimum(tf.maximum(lr, hp.tacotron_emo_loss_weight_init), hp.tacotron_emo_loss_weight_final)
+		weight = tf.minimum(tf.maximum(weight, hp.tacotron_emo_loss_weight_init), hp.tacotron_emo_loss_weight_final)
 
 		return hp.tacotron_emo_loss_weight_init + hp.tacotron_emo_loss_weight_final - weight # invert decay to grow
