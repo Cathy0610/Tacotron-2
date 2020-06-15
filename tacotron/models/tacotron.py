@@ -210,9 +210,9 @@ class Tacotron():
 									# shape of input_alignment: [batch_size * #heads, 1, #token]
 									input_alignment = tf.concat(tf.split(tower_input_style_alignments[i], hp.tacotron_style_attention_num_heads, axis=2), axis=0)
 									style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-														is_training=is_training)
-									token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
-																multiples=[batch_size, 1, 1])
+														is_training=is_training,
+														num_heads=hp.tacotron_style_attention_num_heads)
+									token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0), multiples=[batch_size, 1, 1])
 									style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
 																				token_embedding=token_embedding,
 																				input_alignment=input_alignment)
@@ -232,7 +232,8 @@ class Tacotron():
 									input_alignment = tf.tile(tf.expand_dims(tf.expand_dims(input_alignment, axis=0), axis=0),
 																multiples=[hp.tacotron_style_attention_num_heads*batch_size, 1, 1])
 									style_token_layer = StyleTokenLayer(output_size=hp.tacotron_style_encoder_outputs_size,
-														is_training=is_training)
+														is_training=is_training,
+														num_heads=hp.tacotron_style_attention_num_heads)
 									token_embedding = tf.tile(tf.expand_dims(self.style_embedding_table, axis=0),
 																multiples=[batch_size, 1, 1])
 									style_encoder_outputs, style_logits, style_alignment = style_token_layer(inputs=tf.zeros([1, 1, hp.tacotron_reference_gru_hidden_size]),
