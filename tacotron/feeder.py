@@ -124,7 +124,7 @@ class Feeder:
 
 		text = meta[5]
 
-		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.symbols_lang), dtype=np.int32)
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
@@ -188,7 +188,7 @@ class Feeder:
 
 		text = meta[5]
 
-		input_data = np.asarray(text_to_sequence(text, self._cleaner_names), dtype=np.int32)
+		input_data = np.asarray(text_to_sequence(text, self._cleaner_names, lang=self._hparams.symbols_lang), dtype=np.int32)
 		mel_target = np.load(os.path.join(self._mel_dir, meta[1]))
 		#Create parallel sequences containing zeros to represent a non finished sequence
 		token_target = np.asarray([0.] * (len(mel_target) - 1))
