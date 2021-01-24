@@ -1,80 +1,78 @@
 # Environment Setup
 
-## Ê¹ÓÃÒÑÅäÖÃºÃµÄĞéÄâ»·¾³
+## ä½¿ç”¨å·²é…ç½®å¥½çš„è™šæ‹Ÿç¯å¢ƒ
 
-ÊµÑéÊÒ·şÎñÆ÷ÒÑÅäÖÃºÃ miniconda ÒÔ¼°²¿·Ö¹«ÓÃµÄ»·¾³£¬¿ÉÖ±½ÓÊ¹ÓÃ¡£·½·¨ÈçÏÂ£º
+å®éªŒå®¤æœåŠ¡å™¨å·²é…ç½®å¥½ miniconda ä»¥åŠéƒ¨åˆ†å…¬ç”¨çš„ç¯å¢ƒï¼Œå¯ç›´æ¥ä½¿ç”¨ã€‚æ–¹æ³•å¦‚ä¸‹ï¼š
 
-- ÔÚ¸öÈË»·¾³ÅäÖÃÎÄ¼ş ```~/.bashrc``` ÖĞÔö¼Ó miniconda µÄÂ·¾¶£º
+- åœ¨ä¸ªäººç¯å¢ƒé…ç½®æ–‡ä»¶ ```~/.bashrc``` ä¸­å¢åŠ  miniconda çš„è·¯å¾„ï¼š
 ```bash
 export PATH="/ceph/runtime/miniconda3/bin:$PATH"
 ```
 
-- ¼¤»îËùĞè»·¾³£º£¨ÒÔ rayhane-taco2 ÎªÀı£© 
+- æ¿€æ´»æ‰€éœ€ç¯å¢ƒï¼šï¼ˆä»¥ rayhane-taco2 ä¸ºä¾‹ï¼‰ 
 ```bash
 source activate rayhane-taco2
 ```
 
-## ´Óenvironment.yamlÖĞ´´½¨»·¾³
+## ä»å¤´å¼€å§‹é…ç½®å…¨æ–°ç¯å¢ƒ
 
-## ´ÓÍ·¿ªÊ¼ÅäÖÃÈ«ĞÂ»·¾³
+### å®‰è£… Anaconda or Miniconda
 
-### °²×° Anaconda or Miniconda
+- å¯ä»¥ä»æ¸…åé•œåƒç«™æŸ¥çœ‹ä½¿ç”¨å¸®åŠ©ï¼šhttps://mirrors.tuna.tsinghua.edu.cn/help/anaconda/
 
-- ¿ÉÒÔ´ÓÇå»ª¾µÏñÕ¾²é¿´Ê¹ÓÃ°ïÖú£ºhttps://mirrors.tuna.tsinghua.edu.cn/help/anaconda/
+- å®éªŒå®¤æœåŠ¡å™¨å·²é…ç½®å¥½minicondaï¼Œå¯åœ¨ä¸ªäººç¯å¢ƒé…ç½®æ–‡ä»¶ ```~/.bashrc``` ä¸­å¢åŠ minicondaçš„è·¯å¾„åç›´æ¥ä½¿ç”¨ï¼ˆè·³åˆ°ç¬¬2æ­¥ï¼‰ï¼š
+    ```bash
+    export PATH="/ceph/runtime/miniconda3/bin:$PATH"
+    ```
 
-- ÊµÑéÊÒ·şÎñÆ÷ÒÑÅäÖÃºÃminiconda£¬¿ÉÔÚ¸öÈË»·¾³ÅäÖÃÎÄ¼ş ```~/.bashrc``` ÖĞÔö¼ÓminicondaµÄÂ·¾¶ºóÖ±½ÓÊ¹ÓÃ£¨Ìøµ½µÚ2²½£©£º
-```bash
-export PATH="/ceph/runtime/miniconda3/bin:$PATH"
-```
+- ä»¥ä¸‹ä»¥anacondaä¸ºä¾‹ï¼Œè¯´æ˜å®‰è£…è¿‡ç¨‹ï¼š
 
-- ÒÔÏÂÒÔanacondaÎªÀı£¬ËµÃ÷°²×°¹ı³Ì£º
-
-  - ÏÂÔØ
-    (¶ÔÓ¦python°æ±¾ºÍ²Ù×÷ÏµÍ³°æ±¾: https://mirrors.tuna.tsinghua.edu.cn/anaconda/archive/)
+  - ä¸‹è½½
+    (å¯¹åº”pythonç‰ˆæœ¬å’Œæ“ä½œç³»ç»Ÿç‰ˆæœ¬: https://mirrors.tuna.tsinghua.edu.cn/anaconda/archive/)
     ```bash
     wget https://mirrors.tuna.tsinghua.edu.cn/anaconda/archive/Anaconda3-4.2.0-Linux-x86_64.sh
     ```
-  - °²×°
+  - å®‰è£…
     ```bash
     bash Anaconda3-4.2.0-Linux-x86_64.sh
     ```
-  - Éı¼¶
-    (²Î¿¼: https://stackoverflow.com/questions/38972052/anaconda-update-all-possible-packages)
+  - å‡çº§
+    (å‚è€ƒ: https://stackoverflow.com/questions/38972052/anaconda-update-all-possible-packages)
     ```bash
     conda upgrade --all
     ```
-  - Ìí¼Óchannels
-    (²Î¿¼: https://blog.csdn.net/weixin_43949246/article/details/109637468)   
-    ÒòÎªconda ÏÂÔØÎÄ¼şÒªÓÃµ½¹úÍâµÄ·şÎñÆ÷£¬ËÙ¶ÈÒ»°ã»á±È½ÏÂı£¬ÎÒÃÇ¿ÉÒÔÍ¨¹ıÔö¼Ó¹úÄÚ¾µÏñ·şÎñÆ÷À´½â¾ö¡£
+  - æ·»åŠ channels
+    (å‚è€ƒ: https://blog.csdn.net/weixin_43949246/article/details/109637468)   
+    å› ä¸ºconda ä¸‹è½½æ–‡ä»¶è¦ç”¨åˆ°å›½å¤–çš„æœåŠ¡å™¨ï¼Œé€Ÿåº¦ä¸€èˆ¬ä¼šæ¯”è¾ƒæ…¢ï¼Œæˆ‘ä»¬å¯ä»¥é€šè¿‡å¢åŠ å›½å†…é•œåƒæœåŠ¡å™¨æ¥è§£å†³ã€‚
     ```bash
-    #ÖĞ¹ú¿Æ¼¼´óÑ§µÄÔ´
+    #ä¸­å›½ç§‘æŠ€å¤§å­¦çš„æº
     conda config --add channels http://mirrors.ustc.edu.cn/anaconda/pkgs/main/
     conda config --add channels http://mirrors.ustc.edu.cn/anaconda/pkgs/free/
     conda config --add channels http://mirrors.ustc.edu.cn/anaconda/cloud/conda-forge/
     ```
 
-### ÅäÖÃĞÂµÄ»·¾³
+### é…ç½®æ–°çš„ç¯å¢ƒ
 
 #### 1. Create conda environment
 
-Ê¹ÓÃÒÔÏÂÃüÁî´´½¨ĞéÄâ»·¾³£¬´´½¨Ê±¸ø¶¨ĞéÄâ»·¾³Ãû×ÖºÍpython¡¢pip°æ±¾£º
+ä½¿ç”¨ä»¥ä¸‹å‘½ä»¤åˆ›å»ºè™šæ‹Ÿç¯å¢ƒï¼Œåˆ›å»ºæ—¶ç»™å®šè™šæ‹Ÿç¯å¢ƒåå­—å’Œpythonã€pipç‰ˆæœ¬ï¼š
 ```bash
 conda create -n tfenv pip=20 python=3.5
 ```
 
-×¢£ºÈçÒªÉ¾³ıĞéÄâ»·¾³£¬ÃüÁîÎª£º
+æ³¨ï¼šå¦‚è¦åˆ é™¤è™šæ‹Ÿç¯å¢ƒï¼Œå‘½ä»¤ä¸ºï¼š
 ```bash
 conda remove -n tfenv --all
 ```
 
 #### 2. Activate the environment
 
-Ê¹ÓÃÒÔÏÂÃüÁî¼¤»îĞéÄâ»·¾³£º
+ä½¿ç”¨ä»¥ä¸‹å‘½ä»¤æ¿€æ´»è™šæ‹Ÿç¯å¢ƒï¼š
 ```bash
 source activate tfenv
 ```
 
-×¢£ºÊ¹ÓÃºó£¬¿ÉÍ¨¹ıÈçÏÂÃüÁîÍË³öĞéÄâ»·¾³£º
+æ³¨ï¼šä½¿ç”¨åï¼Œå¯é€šè¿‡å¦‚ä¸‹å‘½ä»¤é€€å‡ºè™šæ‹Ÿç¯å¢ƒï¼š
 ```bash
 conda deactivate
 ```
@@ -85,27 +83,39 @@ conda deactivate
 conda install cudatoolkit=10.0 cudnn=7.6 cupti=10.0 blas numpy pip=20 scipy cython
 ```
 
-NVIDIA gpu¡ªÓ²¼ş£¬Çı¶¯£¬cuda--²¢ĞĞ¼ÆËã¿ò¼Ü£¬cudnn-¼ÓËÙ¿â
+NVIDIA gpuâ€”ç¡¬ä»¶ï¼Œé©±åŠ¨ï¼Œcuda--å¹¶è¡Œè®¡ç®—æ¡†æ¶ï¼Œcudnn-åŠ é€Ÿåº“
 
 #### 4. Install Tensorflow 1.13.1
 
-°²×°Tensorflow gpu°æ±¾£¬gpu°æ±¾ÒªºÍcuda°æ±¾¶ÔÓ¦£º
+å®‰è£…[Tensorflow](https://www.tensorflow.org/install/pip#package-location) gpuç‰ˆæœ¬ï¼Œgpuç‰ˆæœ¬è¦å’Œcudaç‰ˆæœ¬å¯¹åº”ï¼š
 ```bash
-pip install --ignore-installed --upgrade   https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.13.1-cp35-cp35m-linux_x86_64.whl
+pip install --ignore-installed --upgrade https://storage.googleapis.com/tensorflow/linux/gpu/tensorflow_gpu-1.13.1-cp35-cp35m-linux_x86_64.whl
 ```
 
-»òÕßÊ¹ÓÃ¹úÄÚ¾µÏñ£º
+æˆ–è€…ä½¿ç”¨å›½å†…é•œåƒï¼š
 ```bash
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --ignore-installed --upgrade http://mirrors.aliyun.com/pypi/packages/ce/e4/be6d7d17d727b0d2e10d30a87de4e56b8661075eccb8032a8aa5cc84c300/tensorflow_gpu-1.13.1-cp35-cp35m-manylinux1_x86_64.whl#sha256=408eb4ea8adde5dc8c99a72dc678814844a160d8d37c43e677e67ba484d80ab3
 ```
 
-Tensorflow°²×°°üµØÖ·£ºhttps://www.tensorflow.org/install/pip#package-location
-
 #### 5. Install Tacotron2 requirements
 
-°²×°Tacotron2ËùĞèµÄ¿âÎÄ¼ş£º
+å®‰è£…Tacotron2æ‰€éœ€çš„åº“æ–‡ä»¶ï¼š
 ```bash
 pip install -r requirements.txt
 ```
 
-×¢Òâ£ººÍ3.5°æ±¾PythonÊÊÅäµÄllvmlite°æ±¾Îª0.31.0¡£Òò´ËĞèÒªĞŞ¸Ärequirements.txt£¬Ôö¼Ó£ºllvmlite==0.31.0
+æˆ–è€…ä½¿ç”¨å›½å†…é•œåƒï¼š
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+```
+
+æ³¨æ„ï¼šæ ¹æ®[å‚è€ƒèµ„æ–™](https://blog.csdn.net/learning_tortosie/article/details/111977574)ï¼Œå’Œ3.5ç‰ˆæœ¬Pythoné€‚é…çš„llvmliteç‰ˆæœ¬ä¸º0.31.0ã€‚å› æ­¤éœ€è¦ä¿®æ”¹requirements.txtï¼Œå¢åŠ ï¼šllvmlite==0.31.0
+
+### å¤åˆ¶Condaç¯å¢ƒï¼Œç”Ÿæˆenvironment.yamlæ–‡ä»¶
+
+```bash
+conda list -e > environment.yaml
+conda create -n <environment-name> --file environment.yaml
+```
+
+æ³¨æ„ï¼špipç¯å¢ƒå’Œcondaç¯å¢ƒåº”è¯¥åˆ†å¼€ï¼Œè§[å‚è€ƒèµ„æ–™](https://blog.csdn.net/ft_sunshine/article/details/92215164)ã€‚ä¸Šè¿°æ–¹æ³•ç”Ÿæˆçš„yamlæ–‡ä»¶æ²¡æœ‰å°†ä¸¤è€…åˆ†å¼€ï¼Œæ‰§è¡Œ```conda create```å‘½ä»¤æ—¶ä¼šæŠ¥é”™ï¼›ä»…ç”¨äºè®°å½•æ‰€ä½¿ç”¨çš„packageç‰ˆæœ¬ä¿¡æ¯ã€‚

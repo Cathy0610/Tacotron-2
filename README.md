@@ -65,6 +65,8 @@ next you can install the requirements. If you are an Anaconda user: (else replac
 
 > pip install -r requirements.txt
 
+For more details about environment setup, please visit the [Environment Setup page: SETUP.md](SETUP.md).
+
 # Dataset:
 We tested the code above on the [ljspeech dataset](https://keithito.com/LJ-Speech-Dataset/), which has almost 24 hours of labeled single actress voice recording. (further info on the dataset are available in the README file when you download it)
 
@@ -98,7 +100,7 @@ To **train the Tacotron-2 model** using:
 checkpoints will be made each **5000 steps** and stored under **logs-Tacotron folder.**
 
 **Note:**
-- Please refer to train arguments under [train.py](https://github.com/Rayhane-mamah/Tacotron-2/blob/master/train.py) for a set of options you can use.
+- Please refer to train arguments under [train.py](train.py) for a set of options you can use.
 
 # Synthesis
 To **synthesize audio** using:
@@ -106,7 +108,7 @@ To **synthesize audio** using:
 > python synthesize.py
 
 **Note:**
-- Please refer to synthesis arguments under [synthesize.py](https://github.com/Rayhane-mamah/Tacotron-2/blob/master/synthesize.py) for a set of options you can use.
+- Please refer to synthesis arguments under [synthesize.py](synthesize.py) for a set of options you can use.
 
 
 # References and Resources:
