@@ -5,7 +5,8 @@ import tensorflow as tf
 hparams = tf.contrib.training.HParams(
 	# Comma-separated list of cleaners to run on text prior to training and eval. For non-English
 	# text, you may want to use "basic_cleaners" or "transliteration_cleaners".
-	cleaners='english_cleaners',
+	#cleaners='english_cleaners',
+	cleaners='basic_cleaners',
 
 
 	#If you only have 1 GPU or want to use only one GPU, please set num_gpus=0 and specify the GPU idx on run. example:
@@ -67,7 +68,7 @@ hparams = tf.contrib.training.HParams(
 	trim_silence = True, #Whether to clip silence in Audio (at beginning and end of audio only, not the middle)
 	#train samples of lengths between 3sec and 14sec are more than enough to make a model capable of good parallelization.
 	clip_mels_length = True, #For cases of OOM (Not really recommended, only use if facing unsolvable OOM errors, also consider clipping your samples to smaller chunks)
-	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True, please only use after trying output_per_steps=3 and still getting OOM errors.
+	max_mel_frames = 1000,  #Only relevant when clip_mels_length = True, please only use after trying outputs_per_step=3 and still getting OOM errors.
 
 	# Use LWS (https://github.com/Jonathan-LeRoux/lws) for STFT and phase reconstruction
 	# It's preferred to set True to use with https://github.com/r9y9/wavenet_vocoder
@@ -113,6 +114,8 @@ hparams = tf.contrib.training.HParams(
 	###########################################################################################################################################
 
 	#Tacotron
+	symbols_lang = 'en', #language tag determing the used symbol set (en: English characters; py: Chinese Pinyin symbols)
+
 	outputs_per_step = 1, #number of frames to generate at each decoding step (increase to speed up computation and allows for higher batch size, decreases G&L audio quality)
 	stop_at_any = True, #Determines whether the decoder should stop when predicting <stop> to any frame or to all of them (True works pretty well)
 

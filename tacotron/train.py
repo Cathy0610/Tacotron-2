@@ -161,7 +161,7 @@ def train(log_dir, args, hparams):
 	char_embedding_meta = os.path.join(meta_folder, 'CharacterEmbeddings.tsv')
 	if not os.path.isfile(char_embedding_meta):
 		with open(char_embedding_meta, 'w', encoding='utf-8') as f:
-			for symbol in symbols:
+			for symbol in symbols(lang=hparams.symbols_lang):
 				if symbol == ' ':
 					symbol = '\\s' #For visual purposes, swap space with \s
 
@@ -362,7 +362,7 @@ def train(log_dir, args, hparams):
 					plot.plot_spectrogram(mel_prediction, os.path.join(plot_dir, 'step-{}-mel-spectrogram.png'.format(step)),
 						title='{}, {}, step={}, loss={:.5f}'.format(args.model, time_string(), step, loss), target_spectrogram=target,
 						max_len=target_length)
-					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq)))
+					log('Input at step {}: {}'.format(step, sequence_to_text(input_seq, hparams.symbols_lang)))
 
 				if step % args.embedding_interval == 0 or step == args.tacotron_train_steps or step == 1:
 					#Get current checkpoint state

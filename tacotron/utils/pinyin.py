@@ -9,7 +9,6 @@ Supports the following Pinyin-with-label string (Pinyin with prosodic structure 
 
   Meaning of prosodic strucutue labeling tags:
     '-': tag within prosodic word separating syllables (韵律词内部，分割不同音节/单字，一个韵律词由一或多个词典词构成)
-         will be removed when converting to symbols    (切分为symbols时，仅返回韵律词内部的声韵母列表，不返回音节之间的'-'符)
     ' ': tag between different prosodic words          (韵律词边界，分割不同韵律词，用空格' '作为边界是为了保持与英语单词边界一致)
     '/': tag between different prosodic phrases        (韵律短语边界，分割不同韵律短语，相比英文增加了'/'边界)
     ',': tag between different intonational phrases    (语调短语边界，通常和子句对应，用逗号','保持与英语子句边界一致)
@@ -46,7 +45,7 @@ _retroflex = ['rr']
 _tones = ['1', '2', '3', '4', '5']
 
 # Prosodic structure symbols (韵律结构标记)
-_prosodic_struct = [' ', '/', ',', '.', '?', '!']
+_prosodic_struct = ['-', ' ', '/', ',', '.', '?', '!']
 
 
 def split_pinyin(pinyin):
@@ -177,7 +176,7 @@ def pinyin_to_symbols(text):
   text = text.replace('.', ' . ')
   text = text.replace('?', ' ? ')
   text = text.replace('!', ' ! ')
-  text = text.replace('-', ' ')
+  text = text.replace('-', ' - ')
 
   # split into tokens
   tokens = text.strip().split()
@@ -187,7 +186,7 @@ def pinyin_to_symbols(text):
   for token in tokens:
     if token == '|':
       symbols.append(' ')
-    elif token in ['/', ',', '.', '?', '!']:
+    elif token in ['-', '/', ',', '.', '?', '!']:
       symbols.append(token)
     else:
       (initial, final, retroflex, tone) = split_pinyin(token)

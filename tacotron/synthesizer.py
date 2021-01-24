@@ -76,7 +76,7 @@ class Synthesizer:
 				mel_filenames.append(mel_filenames[-1])
 
 		assert 0 == len(texts) % self._hparams.tacotron_num_gpus
-		seqs = [np.asarray(text_to_sequence(text, cleaner_names)) for text in texts]
+		seqs = [np.asarray(text_to_sequence(text, cleaner_names, hparams.symbols_lang)) for text in texts]
 		input_lengths = [len(seq) for seq in seqs]
 		input_speaker_labels = speakers
 		input_language_labels = languages
