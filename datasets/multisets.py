@@ -12,10 +12,11 @@ def build_from_path(hparams, input_dir, mel_dir, linear_dir, wav_dir, n_jobs=12,
   Preprocesses the MultiSets dataset from a gven input path to given output directories
 
     MultiData
-      └── metadata.csv (index for multi-speaker datasets: speaker_id|language_id|metadata_file|wavs_dir|basename_prefix)
+      └── metadata.csv (index for multi-speaker datasets: speaker_id|language_id|metadata_file|metadata_use_raw|wavs_dir|basename_prefix)
     
     The "metadata.csv" stores index for each dataset, where
     1)   "metadata_file" is the metadata of the dataset, specifying "wav_file_name|raw text|text";
+    2)"metadata_use_raw" is the tag indicating whether the "raw text" or "text" will be used (1: raw text; 0: text);
     2)        "wavs_dir" is the directory storing the wav files of the dataset;
     3)      "speaker_id" is the speaker_id of the dataset;
     4)     "language_id" is the language_id of the dataset;
@@ -44,9 +45,10 @@ def build_from_path(hparams, input_dir, mel_dir, linear_dir, wav_dir, n_jobs=12,
       speaker_id  = parts[0]
       language_id = parts[1]
       meta_file   = os.path.join(input_dir, parts[2])
-      wavs_dir    = os.path.join(input_dir, parts[3])
-      base_prefix = parts[4]
-      metadata = _load_metadata(meta_file)
+      meta_useraw = parts[3]=='1'
+      wavs_dir    = os.path.join(input_dir, parts[4])
+      base_prefix = parts[5]
+      metadata = _load_metadata(meta_file, meta_useraw)
       for basename, text in metadata:
         wav_path = os.path.join(wavs_dir, '{}.wav'.format(basename))
         basename = base_prefix + basename
@@ -55,7 +57,7 @@ def build_from_path(hparams, input_dir, mel_dir, linear_dir, wav_dir, n_jobs=12,
   return [future.result() for future in tqdm(futures) if future.result() is not None]
 
 
-def _load_metadata(path):
+def _load_metadata(path, use_raw):
   """
   Load metadata "wav_file_name|raw text|text" from the file
   """
@@ -63,7 +65,7 @@ def _load_metadata(path):
   with open(path, encoding='utf-8') as f:
     for line in f:
       parts = line.strip().strip('\ufeff').split('|')
-      metadata.append((parts[0], parts[2]))
+      metadata.append((parts[0], parts[1] if use_raw else parts[2]))
   return metadata
 
 
