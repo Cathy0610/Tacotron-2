@@ -360,6 +360,15 @@ class Tacotron():
 							or 'RNN' in v.name or 'LSTM' in v.name)]) * reg_weight
 
 					# Compute the speaker adversarial training loss
+					#
+					# The speaker adversarial loss should be computed against each element of the encoder output.
+					#
+					# Take three speakers as example, if speaker_taget is [1 0 0] and speaker_prediction is [0.9 0.1 0], [0.1 0.9 0], .....
+					# It is not accurate to use the averaged prediction [0.5 0.5 0] to compute loss.
+					#
+					# In Google's paper (https://arxiv.org/abs/1907.04448), it is also mentioned that:
+					# 'We impose this adversarial loss separately on EACH ELEMENT of the encoded text sequence,...'
+					#
 					# speaker_prediction: predicted speaker label for each time step of input, with shape [N, T_in, speaker_num]
 					# speaker_targets: one-hot speaker label of current input, tiled from shape [N, speaker_num] to [N, 1, speaker_num] to [N, T_in, speaker_num]
 					speaker_targets = tf.one_hot(self.tower_speaker_labels[i], hp.speaker_num, dtype=tf.float32)
