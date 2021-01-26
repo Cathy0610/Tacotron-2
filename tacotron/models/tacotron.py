@@ -25,7 +25,7 @@ class Tacotron():
 	def __init__(self, hparams):
 		self._hparams = hparams
 
-	def initialize(self, inputs, speaker_labels, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
+	def initialize(self, inputs, speaker_labels, language_labels, input_lengths, mel_targets=None, stop_token_targets=None, linear_targets=None, targets_lengths=None, gta=False,
 			global_step=None, is_training=False, is_evaluating=False, split_infos=None):
 		"""
 		Initializes the model for inference
@@ -35,11 +35,13 @@ class Tacotron():
 			  steps in the input time series, and values are character IDs
 			- speaker_labels: int32 Tensor with shape [N] where N is batch size and values are the speaker ids
 			  of each sequence in inputs.
+			- language_labels: int32 Tensor with shape [N] where N is batch size and values are the language ids
+			  of each sequence in inputs.
 			- input_lengths: int32 Tensor with shape [N] where N is batch size and values are the lengths
-			of each sequence in inputs.
+			  of each sequence in inputs.
 			- mel_targets: float32 Tensor with shape [N, T_out, M] where N is batch size, T_out is number
-			of steps in the output time series, M is num_mels, and values are entries in the mel
-			spectrogram. Only needed for training.
+			  of steps in the output time series, M is num_mels, and values are entries in the mel
+			  spectrogram. Only needed for training.
 		"""
 		if mel_targets is None and stop_token_targets is not None:
 			raise ValueError('no multi targets were provided but token_targets were given')
@@ -63,6 +65,7 @@ class Tacotron():
 			tower_input_lengths = tf.split(input_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 			tower_targets_lengths = tf.split(targets_lengths, num_or_size_splits=hp.tacotron_num_gpus, axis=0) if targets_lengths is not None else targets_lengths
 			tower_speaker_labels = tf.split(speaker_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
+			tower_language_labels = tf.split(language_labels, num_or_size_splits=hp.tacotron_num_gpus, axis=0)
 
 			p_inputs = tf.py_func(split_func, [inputs, split_infos[:, 0]], lout_int)
 			p_mel_targets = tf.py_func(split_func, [mel_targets, split_infos[:,1]], lout_float) if mel_targets is not None else mel_targets
@@ -122,6 +125,11 @@ class Tacotron():
 						'speakers_embedding', [hp.speaker_num, hp.speaker_embedding_dim], dtype=tf.float32)
 					speaker_embeddings = tf.nn.embedding_lookup(self.speaker_embedding_table, tower_speaker_labels[i])
 
+					# Language Embeddings
+					self.language_embedding_table = tf.get_variable(
+						'languages_embedding', [hp.language_num, hp.language_embedding_dim], dtype=tf.float32)
+					language_embeddings = tf.nn.embedding_lookup(self.language_embedding_table, tower_language_labels[i])
+
 
 					#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
 					encoder_cell = TacotronEncoderCell(
@@ -165,6 +173,7 @@ class Tacotron():
 						attention_mechanism,
 						decoder_lstm,
 						speaker_embeddings,
+						language_embeddings,
 						frame_projection,
 						stop_projection)
 
@@ -249,6 +258,7 @@ class Tacotron():
 		if is_training:
 			self.ratio = self.helper._ratio
 		self.tower_speaker_labels = tower_speaker_labels
+		self.tower_language_labels = tower_language_labels
 		self.tower_inputs = tower_inputs
 		self.tower_input_lengths = tower_input_lengths
 		self.tower_mel_targets = tower_mel_targets

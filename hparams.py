@@ -137,6 +137,10 @@ hparams = tf.contrib.training.HParams(
 	speaker_embedding_dim = 64, #dimension of speaker embedding
 	speaker_num = 10, #number of speakers
 
+	#Language embedding
+	language_embedding_dim = 3, #dimension of language embedding
+	language_num=2, #number of languages
+
 	#Attention mechanism
 	smoothing = False, #Whether to smooth the attention normalization function
 	attention_dim = 128, #dimension of attention space
@@ -316,27 +320,12 @@ hparams = tf.contrib.training.HParams(
 	#Eval sentences (if no eval text file was specified during synthesis, these sentences are used for eval)
 	sentences = [
 	# From July 8, 2017 New York Times:
-	'Scientists at the CERN laboratory say they have discovered a new particle.',
-	'There\'s a way to measure the acute emotional intelligence that has never gone out of style.',
-	'President Trump met with other leaders at the Group of 20 conference.',
-	'The Senate\'s bill to repeal and replace the Affordable Care Act is now imperiled.',
-	# From Google's Tacotron example page:
-	'Generative adversarial network or variational auto-encoder.',
-	'Basilar membrane and otolaryngology are not auto-correlations.',
-	'He has read the whole thing.',
-	'He reads books.',
-	'He thought it was time to present the present.',
-	'Thisss isrealy awhsome.',
-	'Punctuation sensitivity, is working.',
-	'Punctuation sensitivity is working.',
-	"Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?",
-	"She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.",
-	"Tajima Airport serves Toyooka.",
-	#From The web (random long utterance)
-	'Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization.\
-	This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that\
-	the adopted architecture is able to perform this task with wild success.',
-	'Thank you so much for your support!',
+	'Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition|0|0',
+	'tong2-shi2 zai4 ao4-yun4 qi1-jian1, che1-xian3 bao4-an4-de5 shou3-xu4 ye3-jiang1 jian3-hua4.|0|1',
+	'in being comparatively modern.|1|0',
+	'He thought it was time to present the present.|1|1',
+	'zhi3-jian4 ta1-men5 di1-zhe5-tou2 qiang2-ren3 bei1-tong4, jian1-tou2 yi2-chan4 yi2-chan4-de5.|1|1',
+	'zhuang4-zhuang5 sheng1-ri4 kuai4-le4, wo3 jia1-li6 you3-shi4, mei2-fa3 gan6-chang3.|3|1'
 	]
 
 	)

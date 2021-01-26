@@ -75,6 +75,7 @@ class Feeder:
 			tf.placeholder(tf.int32, shape=(None, None), name='inputs'),
 			tf.placeholder(tf.int32, shape=(None, ), name='input_lengths'),
 			tf.placeholder(tf.int32, shape=(None, ), name='speaker_labels'),
+			tf.placeholder(tf.int32, shape=(None, ), name='language_labels'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_mels), name='mel_targets'),
 			tf.placeholder(tf.float32, shape=(None, None), name='token_targets'),
 			tf.placeholder(tf.float32, shape=(None, None, hparams.num_freq), name='linear_targets'),
@@ -83,33 +84,35 @@ class Feeder:
 			]
 
 			# Create queue for buffering data
-			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='input_queue')
+			queue = tf.FIFOQueue(8, [tf.int32, tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='input_queue')
 			self._enqueue_op = queue.enqueue(self._placeholders)
-			self.inputs, self.input_lengths, self.speaker_labels, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos = queue.dequeue()
+			self.inputs, self.input_lengths, self.speaker_labels, self.language_labels, self.mel_targets, self.token_targets, self.linear_targets, self.targets_lengths, self.split_infos = queue.dequeue()
 
 			self.inputs.set_shape(self._placeholders[0].shape)
 			self.input_lengths.set_shape(self._placeholders[1].shape)
 			self.speaker_labels.set_shape(self._placeholders[2].shape)
-			self.mel_targets.set_shape(self._placeholders[3].shape)
-			self.token_targets.set_shape(self._placeholders[4].shape)
-			self.linear_targets.set_shape(self._placeholders[5].shape)
-			self.targets_lengths.set_shape(self._placeholders[6].shape)
-			self.split_infos.set_shape(self._placeholders[7].shape)
+			self.language_labels.set_shape(self._placeholders[3].shape)
+			self.mel_targets.set_shape(self._placeholders[4].shape)
+			self.token_targets.set_shape(self._placeholders[5].shape)
+			self.linear_targets.set_shape(self._placeholders[6].shape)
+			self.targets_lengths.set_shape(self._placeholders[7].shape)
+			self.split_infos.set_shape(self._placeholders[8].shape)
 
 			# Create eval queue for buffering eval data
-			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='eval_queue')
+			eval_queue = tf.FIFOQueue(1, [tf.int32, tf.int32, tf.int32, tf.int32, tf.float32, tf.float32, tf.float32, tf.int32, tf.int32], name='eval_queue')
 			self._eval_enqueue_op = eval_queue.enqueue(self._placeholders)
-			self.eval_inputs, self.eval_input_lengths, self.eval_speaker_labels, self.eval_mel_targets, self.eval_token_targets, \
+			self.eval_inputs, self.eval_input_lengths, self.eval_speaker_labels, self.eval_language_labels, self.eval_mel_targets, self.eval_token_targets, \
 				self.eval_linear_targets, self.eval_targets_lengths, self.eval_split_infos = eval_queue.dequeue()
 
 			self.eval_inputs.set_shape(self._placeholders[0].shape)
 			self.eval_input_lengths.set_shape(self._placeholders[1].shape)
 			self.eval_speaker_labels.set_shape(self._placeholders[2].shape)
-			self.eval_mel_targets.set_shape(self._placeholders[3].shape)
-			self.eval_token_targets.set_shape(self._placeholders[4].shape)
-			self.eval_linear_targets.set_shape(self._placeholders[5].shape)
-			self.eval_targets_lengths.set_shape(self._placeholders[6].shape)
-			self.eval_split_infos.set_shape(self._placeholders[7].shape)
+			self.eval_language_labels.set_shape(self._placeholders[3].shape)
+			self.eval_mel_targets.set_shape(self._placeholders[4].shape)
+			self.eval_token_targets.set_shape(self._placeholders[5].shape)
+			self.eval_linear_targets.set_shape(self._placeholders[6].shape)
+			self.eval_targets_lengths.set_shape(self._placeholders[7].shape)
+			self.eval_split_infos.set_shape(self._placeholders[8].shape)
 
 	def start_threads(self, session):
 		self._session = session
@@ -238,7 +241,7 @@ class Feeder:
 			split_infos.append([input_max_len, mel_target_max_len, token_target_max_len, linear_target_max_len])
 
 		split_infos = np.asarray(split_infos, dtype=np.int32)
-		return (inputs, input_lengths, speaker_labels, mel_targets, token_targets, linear_targets, targets_lengths, split_infos)
+		return (inputs, input_lengths, speaker_labels, language_labels, mel_targets, token_targets, linear_targets, targets_lengths, split_infos)
 
 	def _prepare_inputs(self, inputs):
 		max_len = max([len(x) for x in inputs])

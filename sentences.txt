@@ -1,19 +1,6 @@
 Scientists at the CERN laboratory say they have discovered a new particle.|0|0
-There's a way to measure the acute emotional intelligence that has never gone out of style.|0|0
-President Trump met with other leaders at the Group of 20 conference.|0|0
-The Senate's bill to repeal and replace the Affordable Care Act is now imperiled.|0|0
-
-Generative adversarial network or variational auto-encoder.|0|0
-Basilar membrane and otolaryngology are not auto-correlations.|0|0
-He has read the whole thing.|0|0
-He reads books.|0|0
-He thought it was time to present the present.|0|0
-Thisss isrealy awhsome.|0|0
-Punctuation sensitivity, is working.|0|0
-Punctuation sensitivity is working.|0|0
-Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?|0|0
-She sells sea-shells on the sea-shore. The shells she sells are sea-shells I'm sure.|0|0
-Tajima Airport serves Toyooka.|0|0
-
-Sequence to sequence models have enjoyed great success in a variety of tasks such as machine translation, speech recognition, and text summarization. This project covers a sequence to sequence model trained to predict a speech representation from an input sequence of characters. We show that the adopted architecture is able to perform this task with wild success.|0|0
-Thank you so much for your support!|0|0
+wo3-xi3-huan1 chi1-shu1-cai4, bu4-xi3-huan1 chi1-rou4.|0|1
+There's a way to measure the acute emotional intelligence that has never gone out of style.|1|0
+jian1-jia1 cang1-cang1, bai2-lu4 wei2-shuang1.|1|1
+wo3-you3 yi2-ge4 deadline yao4-wan2-cheng2.|1|0
+wo3-you3 yi2-ge4 deadline yao4-wan2-cheng2.|1|1

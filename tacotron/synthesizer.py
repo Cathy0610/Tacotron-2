@@ -19,14 +19,15 @@ class Synthesizer:
 		inputs = tf.placeholder(tf.int32, (None, None), name='inputs')
 		input_lengths = tf.placeholder(tf.int32, (None, ), name='input_lengths')
 		speaker_labels = tf.placeholder(tf.int32, (None, ), name='speaker_labels')
+		language_labels = tf.placeholder(tf.int32, (None, ), name='language_labels')
 		targets = tf.placeholder(tf.float32, (None, None, hparams.num_mels), name='mel_targets')
 		split_infos = tf.placeholder(tf.int32, shape=(hparams.tacotron_num_gpus, None), name='split_infos')
 		with tf.variable_scope('Tacotron_model') as scope:
 			self.model = create_model(model_name, hparams)
 			if gta:
-				self.model.initialize(inputs, speaker_labels, input_lengths, targets, gta=gta, split_infos=split_infos)
+				self.model.initialize(inputs, speaker_labels, language_labels, input_lengths, targets, gta=gta, split_infos=split_infos)
 			else:
-				self.model.initialize(inputs, speaker_labels, input_lengths, split_infos=split_infos)
+				self.model.initialize(inputs, speaker_labels, language_labels, input_lengths, split_infos=split_infos)
 
 			self.mel_outputs = self.model.tower_mel_outputs
 			self.linear_outputs = self.model.tower_linear_outputs if (hparams.predict_linear and not gta) else None
@@ -48,6 +49,7 @@ class Synthesizer:
 		self.inputs = inputs
 		self.input_lengths = input_lengths
 		self.speaker_labels = speaker_labels
+		self.language_labels = language_labels
 		self.targets = targets
 		self.split_infos = split_infos
 
@@ -96,6 +98,7 @@ class Synthesizer:
 			self.inputs: input_seqs,
 			self.input_lengths: np.asarray(input_lengths, dtype=np.int32),
 			self.speaker_labels: np.asarray(input_speaker_labels, dtype=np.int32),
+			self.language_labels: np.asarray(input_language_labels, dtype=np.int32),
 		}
 
 		if self.gta:
