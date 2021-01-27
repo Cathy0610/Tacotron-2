@@ -125,6 +125,9 @@ def split_pinyin(pinyin):
     # change all leading 'u' to 'v'
     elif initial in ['j', 'q', 'x'] and final[0] == 'u':
       final = 'v' + final[1:]
+    # lue->lve, nue->nve
+    if final == 'ue':
+      final ='ve'
     # ui->uei
     # iu->iou
     # un->uen
