@@ -142,43 +142,46 @@ class ZoneoutLSTMCell(tf.nn.rnn_cell.RNNCell):
 
 
 class EncoderConvolutions:
-	"""Encoder convolutional layers used to find local dependencies in inputs characters.
+	"""Encoder convolutional layers used to find local dependencies in inputs.
 	"""
-	def __init__(self, is_training, hparams, activation=tf.nn.relu, scope=None):
+	def __init__(self, is_training, kernel_size, channels, layers, dropout_rate, activation=tf.nn.relu, scope=None):
 		"""
 		Args:
 			is_training: Boolean, determines if the model is training or in inference to control dropout
 			kernel_size: tuple or integer, The size of convolution kernels
 			channels: integer, number of convolutional kernels
+			layers: integer, number of convolutional layers
+			dropout_rate: float, dropout rate
 			activation: callable, postnet activation function for each convolutional layer
-			scope: Postnet scope.
+			scope: Encoder convolution layers scope.
 		"""
 		super(EncoderConvolutions, self).__init__()
 		self.is_training = is_training
 
-		self.kernel_size = hparams.enc_conv_kernel_size
-		self.channels = hparams.enc_conv_channels
+		self.kernel_size = kernel_size
+		self.channels = channels
 		self.activation = activation
+		self.layers = layers
+		self.drop_rate = dropout_rate
 		self.scope = 'enc_conv_layers' if scope is None else scope
-		self.drop_rate = hparams.tacotron_dropout_rate
-		self.enc_conv_num_layers = hparams.enc_conv_num_layers
 
 	def __call__(self, inputs):
 		with tf.variable_scope(self.scope):
 			x = inputs
-			for i in range(self.enc_conv_num_layers):
+			for i in range(self.layers):
 				x = conv1d(x, self.kernel_size, self.channels, self.activation,
 					self.is_training, self.drop_rate, 'conv_layer_{}_'.format(i + 1)+self.scope)
 		return x
 
 
 class EncoderRNN:
-	"""Encoder bidirectional one layer LSTM
+	"""Encoder stacked bidirectional LSTM layers
 	"""
-	def __init__(self, is_training, size=256, zoneout=0.1, scope=None):
+	def __init__(self, is_training, layers=1, size=256, zoneout=0.1, scope=None):
 		"""
 		Args:
 			is_training: Boolean, determines if the model is training or in inference to control zoneout
+			layers: integer, number of LSTM layers
 			size: integer, the number of LSTM units for each direction
 			zoneout: the zoneout factor
 			scope: EncoderRNN scope.
@@ -186,27 +189,32 @@ class EncoderRNN:
 		super(EncoderRNN, self).__init__()
 		self.is_training = is_training
 
+		self.layers = layers
 		self.size = size
 		self.zoneout = zoneout
 		self.scope = 'encoder_LSTM' if scope is None else scope
 
 		#Create forward LSTM Cell
-		self._fw_cell = ZoneoutLSTMCell(size, is_training,
+		self._fw_cell = [ZoneoutLSTMCell(size, is_training,
 			zoneout_factor_cell=zoneout,
 			zoneout_factor_output=zoneout,
-			name='encoder_fw_LSTM')
+			name='lstm_fw_{}_'.format(i+1)+self.scope) for i in range(layers)]
+		#Stack forward LSTM Cells
+		self._stacked_fw_cell = tf.contrib.rnn.MultiRNNCell(self._fw_cell, state_is_tuple=True)
 
 		#Create backward LSTM Cell
-		self._bw_cell = ZoneoutLSTMCell(size, is_training,
+		self._bw_cell = [ZoneoutLSTMCell(size, is_training,
 			zoneout_factor_cell=zoneout,
 			zoneout_factor_output=zoneout,
-			name='encoder_bw_LSTM')
+			name='lstm_bw_{}_'.format(i+1)+self.scope) for i in range(layers)]
+		#Stack backward LSTM Cells
+		self._stacked_bw_cell = tf.contrib.rnn.MultiRNNCell(self._bw_cell, state_is_tuple=True)
 
 	def __call__(self, inputs, input_lengths):
 		with tf.variable_scope(self.scope):
 			outputs, (fw_state, bw_state) = tf.nn.bidirectional_dynamic_rnn(
-				self._fw_cell,
-				self._bw_cell,
+				self._stacked_fw_cell,
+				self._stacked_bw_cell,
 				inputs,
 				sequence_length=input_lengths,
 				dtype=tf.float32,
