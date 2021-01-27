@@ -125,6 +125,7 @@ hparams = tf.contrib.training.HParams(
 	enc_conv_num_layers = 3, #number of encoder convolutional layers
 	enc_conv_kernel_size = (5, ), #size of encoder convolution filters for each layer
 	enc_conv_channels = 512, #number of encoder convolutions filters for each layer
+	encoder_lstm_layers = 1, #number of encoder lstm layers
 	encoder_lstm_units = 256, #number of lstm units for each direction (forward and backward)
 
 	#Speaker classifier

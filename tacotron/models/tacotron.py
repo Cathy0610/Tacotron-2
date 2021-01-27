@@ -132,10 +132,13 @@ class Tacotron():
 
 
 					#Encoder Cell ==> [batch_size, encoder_steps, encoder_lstm_units]
+					encoder_convolutions = EncoderConvolutions(is_training, hp.enc_conv_kernel_size, hp.enc_conv_channels,
+						hp.enc_conv_num_layers, hp.tacotron_dropout_rate, scope='encoder_convolutions')
+					encoder_rnn = EncoderRNN(is_training, layers=hp.encoder_lstm_layers, size=hp.encoder_lstm_units,
+						zoneout=hp.tacotron_zoneout_rate, scope='encoder_LSTM')
 					encoder_cell = TacotronEncoderCell(
-						EncoderConvolutions(is_training, hparams=hp, scope='encoder_convolutions'),
-						EncoderRNN(is_training, size=hp.encoder_lstm_units,
-							zoneout=hp.tacotron_zoneout_rate, scope='encoder_LSTM'))
+						encoder_convolutions,
+						encoder_rnn)
 
 					encoder_outputs = encoder_cell(embedded_inputs, tower_input_lengths[i])
 
