@@ -4,7 +4,7 @@ from infolog import log
 from tacotron.models.helpers import TacoTrainingHelper, TacoTestHelper
 from tacotron.models.modules import *
 from tensorflow.contrib.seq2seq import dynamic_decode
-from tacotron.models.Architecture_wrappers import TacotronEncoderCell, TacotronDecoderCell
+from tacotron.models.Architecture_wrappers import TacotronEncoderCell, ResidualEncoderCell, TacotronDecoderCell
 from tacotron.models.custom_decoder import CustomDecoder
 from tacotron.models.attention import LocationSensitiveAttention
 
@@ -95,6 +95,8 @@ class Tacotron():
 		self.tower_mel_outputs = []
 		self.tower_linear_outputs = []
 		self.tower_speaker_prediction = []
+		self.tower_residual_mean = []
+		self.tower_residual_var = []
 
 		tower_speaker_embeddings = []
 		tower_embedded_inputs = []
@@ -154,6 +156,21 @@ class Tacotron():
 					speaker_prediction = speaker_classifier(encoder_outputs, hp.speaker_grad_rev_scale, hp.speaker_grad_clip_factor)
 
 
+					#Variational AutoEncoder-like Residual Encoder
+					residual_convolutions = EncoderConvolutions(is_training, hp.res_conv_kernel_size, hp.res_conv_channels,
+						hp.res_conv_num_layers, hp.tacotron_dropout_rate, scope='residual_encoder_convolutions')
+					residual_rnn = EncoderRNN(is_training, layers=hp.res_lstm_layers, size=hp.res_lstm_units,
+						zoneout=hp.tacotron_zoneout_rate, scope='residual_encoder_LSTM')
+					residual_encoder_cell = ResidualEncoderCell(
+						is_training,
+						residual_convolutions,
+						residual_rnn,
+						hp.res_latent_dim)
+
+					#Residual encodings
+					residual_encoding, residual_mean, residual_var = residual_encoder_cell(tower_mel_targets[i], batch_size)
+
+
 					#Decoder Parts
 					#Attention Decoder Prenet
 					prenet = Prenet(is_training, layers_sizes=hp.prenet_layers, drop_rate=hp.tacotron_dropout_rate, scope='decoder_prenet')
@@ -177,6 +194,7 @@ class Tacotron():
 						decoder_lstm,
 						speaker_embeddings,
 						language_embeddings,
+						residual_encoding,
 						frame_projection,
 						stop_projection)
 
@@ -246,6 +264,9 @@ class Tacotron():
 					self.tower_stop_token_prediction.append(stop_token_prediction)
 					self.tower_mel_outputs.append(mel_outputs)
 					self.tower_speaker_prediction.append(speaker_prediction)
+					self.tower_residual_mean.append(residual_mean)
+					self.tower_residual_var.append(residual_var)
+
 					tower_speaker_embeddings.append(speaker_embeddings)
 					tower_embedded_inputs.append(embedded_inputs)
 					tower_enc_conv_output_shape.append(enc_conv_output_shape)
@@ -305,6 +326,7 @@ class Tacotron():
 		self.tower_regularization_loss = []
 		self.tower_linear_loss = []
 		self.tower_adversarial_loss = []
+		self.tower_residual_loss = []
 		self.tower_loss = []
 
 		total_before_loss = 0
@@ -313,6 +335,7 @@ class Tacotron():
 		total_regularization_loss = 0
 		total_linear_loss = 0
 		total_adversarial_loss = 0
+		total_residual_loss = 0
 		total_loss = 0
 
 		gpus = ["/gpu:{}".format(i) for i in range(hp.tacotron_gpu_start_idx, hp.tacotron_gpu_start_idx+hp.tacotron_num_gpus)]
@@ -391,6 +414,11 @@ class Tacotron():
 						labels=speaker_targets,
 						logits=self.tower_speaker_prediction[i]))
 
+					# Compute the KL divergence loss of residual recoding
+					# (mu, var) ~ N(0, 1)
+					kl_div = -0.5 * (self.tower_residual_var[i] + 1 - self.tower_residual_mean[i] ** 2 - tf.exp(self.tower_residual_var[i]))
+					residual_loss = tf.reduce_mean(kl_div)
+
 					# Compute final loss term
 					self.tower_before_loss.append(before)
 					self.tower_after_loss.append(after)
@@ -398,8 +426,9 @@ class Tacotron():
 					self.tower_regularization_loss.append(regularization)
 					self.tower_linear_loss.append(linear_loss)
 					self.tower_adversarial_loss.append(adversarial_loss)
+					self.tower_residual_loss.append(residual_loss)
 
-					loss = before + after + stop_token_loss + regularization + linear_loss + hp.speaker_loss_weight * adversarial_loss
+					loss = before + after + stop_token_loss + regularization + linear_loss + hp.speaker_loss_weight * adversarial_loss + hp.res_loss_weight * residual_loss
 					self.tower_loss.append(loss)
 
 		for i in range(hp.tacotron_num_gpus):
@@ -409,6 +438,7 @@ class Tacotron():
 			total_regularization_loss += self.tower_regularization_loss[i]
 			total_linear_loss += self.tower_linear_loss[i]
 			total_adversarial_loss += self.tower_adversarial_loss[i]
+			total_residual_loss += self.tower_residual_loss[i]
 			total_loss += self.tower_loss[i]
 
 		self.before_loss = total_before_loss / hp.tacotron_num_gpus
@@ -417,6 +447,7 @@ class Tacotron():
 		self.regularization_loss = total_regularization_loss / hp.tacotron_num_gpus
 		self.linear_loss = total_linear_loss / hp.tacotron_num_gpus
 		self.adversarial_loss = total_adversarial_loss / hp.tacotron_num_gpus
+		self.residual_loss = total_residual_loss / hp.tacotron_num_gpus
 		self.loss = total_loss / hp.tacotron_num_gpus
 
 	def add_optimizer(self, global_step):

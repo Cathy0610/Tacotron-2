@@ -142,6 +142,15 @@ hparams = tf.contrib.training.HParams(
 	language_embedding_dim = 3, #dimension of language embedding
 	language_num=2, #number of languages
 
+	#Residual encoder parameters
+	res_conv_num_layers = 2, #number of residual encoder convolutional layers
+	res_conv_kernel_size = (3, ), #size of residual encoder convolution filters for each layer
+	res_conv_channels = 512, #number of residual encoder convolution channels for each layer
+	res_lstm_layers = 2, #number of residual encoder lstm layers
+	res_lstm_units = 256, #number of lstm units for each direction (forward and backward)
+	res_latent_dim = 16, #dimension of latent variables (Gaussian mean and log variance)
+	res_loss_weight = 1, #weight of residual loss
+
 	#Attention mechanism
 	smoothing = False, #Whether to smooth the attention normalization function
 	attention_dim = 128, #dimension of attention space

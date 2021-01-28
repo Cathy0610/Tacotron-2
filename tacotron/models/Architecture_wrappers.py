@@ -45,6 +45,76 @@ class TacotronEncoderCell(RNNCell):
 		return hidden_representation
 
 
+class ResidualEncoderCell(RNNCell):
+	"""Variational AutoEncoder-like Residual Encoder Cell
+
+	Residual Encoder description: https://arxiv.org/abs/1907.04448
+
+	Follow the structure in: https://arxiv.org/abs/1810.07217
+
+	* : A mel spectrogram is first passed through 2 convolutional layers, which contains 512 filters with shape 3 × 1. 
+	The output of these convolutional layers is then fed to a stack of 2 bidirectional LSTM layers with 256 cells at each direction.
+	A mean pooling layer is used to summarize the LSTM outputs across time, 
+	followed by a linear projection layer to predict the posterior mean and log variance.
+	"""
+
+	def __init__(self, is_training, convolutional_layers, lstm_layers, latent_dim):
+		"""Initialize variational autoencoder-like residule encoder parameters
+
+		Args:
+			is_training: Boolean, determines if the model is training or in inference to control reparameterization (use all zeros prior mean or not)
+			convolutional_layers: encoder convolutional block class
+			lstm_layers: encoder bidirectional lstm layer class
+			latent_dim: dimension of the latent posterior mean and log variance
+		"""
+		super(ResidualEncoderCell, self).__init__()
+
+		self.is_training = is_training
+		self._latent_dim = latent_dim
+
+		#Initialize encoder layers
+		self._convolutions = convolutional_layers
+		self._lstm = lstm_layers
+
+		#linear projection layers
+		self._latent_mean = tf.layers.Dense(units=latent_dim, name='residual_encoder_latent_mean')
+		self._latent_var = tf.layers.Dense(units=latent_dim, name='residual_encoder_latent_var')
+
+	def _reparameterize(self, mu, log_var):
+		"""Reparameterize from mean and variance
+		"""
+		eps = tf.random.normal(tf.shape(log_var))
+		std = tf.exp(log_var) ** 0.5
+		z = mu + std * eps
+		return z
+
+	def __call__(self, inputs, batch_size):
+		if self.is_training:
+			#pass mel spectrogram through a stack of convolutional layers
+			conv_output = self._convolutions(inputs)
+
+			#LSTM layers
+			lstm_output = self._lstm(conv_output, input_lengths=None)
+
+			#average mean pooling
+			average_pool_output = tf.reduce_mean(lstm_output, axis=1)
+
+			#mean and var layer
+			latent_mean = self._latent_mean(average_pool_output)
+			latent_var = self._latent_var(average_pool_output)
+
+			#reparameterize
+			output = self._reparameterize(latent_mean, latent_var)
+
+		else:
+			#use prior mean (all zeros) directly
+			output = tf.zeros([batch_size, self._latent_dim], dtype=tf.float32)
+			latent_mean = output
+			latent_var = output
+
+		return output, latent_mean, latent_var
+
+
 class TacotronDecoderCellState(
 	collections.namedtuple("TacotronDecoderCellState",
 	 ("cell_state", "attention", "time", "alignments",
@@ -84,7 +154,7 @@ class TacotronDecoderCell(RNNCell):
 	tensorflow's attention wrapper call if it was using cumulative alignments instead of previous alignments only.
 	"""
 
-	def __init__(self, prenet, attention_mechanism, rnn_cell, speaker_embedding, language_embedding, frame_projection, stop_projection):
+	def __init__(self, prenet, attention_mechanism, rnn_cell, speaker_embedding, language_embedding, residual_encoding, frame_projection, stop_projection):
 		"""Initialize decoder parameters
 
 		Args:
@@ -94,6 +164,7 @@ class TacotronDecoderCell(RNNCell):
 		    rnn_cell: Instance of RNNCell, main body of the decoder
 		    speaker_embedding: Speaker Embedding to build the speaker dependent decoder
 		    language_embedding: Language Embedding to incorporate language information into the decoder
+		    residual_encoding: Latent factors from Mel spectrogram, reparameterized from Residual Encoder during training, or Prior Mean during inference
 		    frame_projection: tensorflow fully connected layer with r * num_mels output units
 		    stop_projection: tensorflow fully connected layer, expected to project to a scalar
 			    and through a sigmoid activation
@@ -106,6 +177,7 @@ class TacotronDecoderCell(RNNCell):
 		self._cell = rnn_cell
 		self._speaker_embedding = speaker_embedding
 		self._language_embedding = language_embedding
+		self._residual_encoding = residual_encoding
 		self._frame_projection = frame_projection
 		self._stop_projection = stop_projection
 
@@ -173,7 +245,7 @@ class TacotronDecoderCell(RNNCell):
 		prenet_output = self._prenet(inputs)
 
 		#Concat context vector and prenet output to form LSTM cells input (input feeding)
-		LSTM_input = tf.concat([prenet_output, state.attention, self._speaker_embedding, self._language_embedding], axis=-1)
+		LSTM_input = tf.concat([prenet_output, state.attention, self._speaker_embedding, self._language_embedding, self._residual_encoding], axis=-1)
 
 		#Unidirectional LSTM layers
 		LSTM_output, next_cell_state = self._cell(LSTM_input, state.cell_state)
