@@ -1,5 +1,7 @@
-# Tacotron-2:
+# Tacotron-2-Multispeaker:
 Tensorflow implementation of DeepMind's Tacotron-2. A deep neural network architecture described in this paper: [Natural TTS synthesis by conditioning Wavenet on MEL spectogram predictions](https://arxiv.org/pdf/1712.05884.pdf)
+
+Multispeaker implement for _**multispeaker multilingual** speech synthesis_ and _**cross-language** voice cloning_. Module details follow the archtecture in Google's paper: [Learning to Speak Fluently in a Foreign Language: Multilingual Speech Synthesis and Cross-Language Voice Cloning](https://arxiv.org/abs/1907.04448)
 
 Forked from https://github.com/Rayhane-mamah/Tacotron-2 with [the commit on 2018.10.07] (https://github.com/Rayhane-mamah/Tacotron-2/tree/970b0803bb41e68cbac854dc958dbb03f34f9604)
 
