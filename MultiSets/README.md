@@ -28,11 +28,17 @@ Each line of "metadata.csv" has 6 parts separated by "|", including:
   ```
 
 Where
-  *       "speaker_id" is the speaker_id of the dataset (特定数据集的说话人标签id, 从0开始);
-  *      "language_id" is the language_id of the dataset (特定数据集的语言标签id, 从0开始);
-  *    "metadata_file" is the metadata of the dataset, specifying "wav_file_name|raw text|text" (某个特定数据集的metadata文件);
-  * "metadata_use_raw" is the tag indicating if "raw text" or "text" in "metadata_file" will be used (1: raw text; 0: text) (指定使用raw text还是text作为模型输入);
-  *         "wavs_dir" is the directory storing the wav files of the dataset (特定数据集的波形文件目录);
-  *  "basename_prefix" specifies the basename prefix of the generated training data (通过prefix防止多个数据集的wav文件名一样, 建议格式: 两位说话人标签_语言标签_).
+  *           "speaker_id" is the speaker_id of the dataset 
+                              (特定数据集的说话人标签id, 从0开始);
+  *          "language_id" is the language_id of the dataset 
+                              (特定数据集的语言标签id, 从0开始);
+  *        "metadata_file" is the metadata of the dataset, specifying "wav_file_name|raw text|text" 
+                              (某个特定数据集的metadata文件);
+  *     "metadata_use_raw" is the tag indicating if "raw text" or "text" in "metadata_file" will be used (1: raw text; 0: text) 
+                              (指定使用raw text还是text作为模型输入);
+  *             "wavs_dir" is the directory storing the wav files of the dataset 
+                              (特定数据集的波形文件目录);
+  *      "basename_prefix" specifies the basename prefix of the generated training data 
+                              (通过prefix防止多个数据集的wav文件名一样, 建议格式: 两位说话人标签_语言标签_).
 
 See [../datasets/multisets.py](../datasets/multisets.py) for more information.
