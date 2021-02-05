@@ -168,7 +168,12 @@ class Tacotron():
 						hp.res_latent_dim)
 
 					#Residual encodings
-					residual_encoding, residual_mean, residual_var = residual_encoder_cell(tower_mel_targets[i], batch_size)
+					if is_training:
+						#sampling via reparameterization during training
+						residual_encoding, residual_mean, residual_var = residual_encoder_cell(tower_mel_targets[i], batch_size)
+					else:
+						#use prior mean (all zeros) directly during inference or evaluation
+						residual_encoding, residual_mean, residual_var = residual_encoder_cell(None, batch_size)
 
 
 					#Decoder Parts
